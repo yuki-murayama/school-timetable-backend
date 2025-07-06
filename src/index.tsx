@@ -535,10 +535,12 @@ app.get('/api/frontend/school/subjects', async c => {
   try {
     const db = c.env.DB
     
-    // subjectsテーブルが存在しない場合は作成
+    // subjectsテーブルのスキーマを強制的に修正
+    // 既存のテーブルを削除して正しいスキーマで再作成
+    await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
     await db
       .prepare(`
-      CREATE TABLE IF NOT EXISTS subjects (
+      CREATE TABLE subjects (
         id TEXT PRIMARY KEY,
         school_id TEXT NOT NULL DEFAULT 'school-1',
         name TEXT NOT NULL,
@@ -549,41 +551,6 @@ app.get('/api/frontend/school/subjects', async c => {
       )
     `)
       .run()
-    
-    // 既存のテーブルにspecial_classroomとdescriptionカラムを追加（存在しない場合）
-    try {
-      await db.prepare(`ALTER TABLE subjects ADD COLUMN special_classroom TEXT`).run()
-    } catch (error) {
-      // カラムが既に存在する場合は無視
-    }
-    
-    try {
-      await db.prepare(`ALTER TABLE subjects ADD COLUMN description TEXT`).run()
-    } catch (error) {
-      // カラムが既に存在する場合は無視
-    }
-    
-    // テーブル構造を検証（PRAGMA table_info を使用してカラムの存在を確認）
-    const tableInfo = await db.prepare(`PRAGMA table_info(subjects)`).all()
-    const hasSpecialClassroom = tableInfo.results.some((col: any) => col.name === 'special_classroom')
-    const hasDescription = tableInfo.results.some((col: any) => col.name === 'description')
-    
-    if (!hasSpecialClassroom || !hasDescription) {
-      // カラムが存在しない場合は、テーブルを再作成
-      console.log('Recreating subjects table due to schema mismatch')
-      await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
-      await db.prepare(`
-        CREATE TABLE subjects (
-          id TEXT PRIMARY KEY,
-          school_id TEXT NOT NULL DEFAULT 'school-1',
-          name TEXT NOT NULL,
-          special_classroom TEXT,
-          description TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `).run()
-    }
     
     // 教科一覧を取得
     const result = await db
@@ -644,10 +611,12 @@ app.post('/api/frontend/school/subjects', async c => {
       )
     }
     
-    // subjectsテーブルが存在しない場合は作成
+    // subjectsテーブルのスキーマを強制的に修正
+    // 既存のテーブルを削除して正しいスキーマで再作成
+    await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
     await db
       .prepare(`
-      CREATE TABLE IF NOT EXISTS subjects (
+      CREATE TABLE subjects (
         id TEXT PRIMARY KEY,
         school_id TEXT NOT NULL DEFAULT 'school-1',
         name TEXT NOT NULL,
@@ -658,41 +627,6 @@ app.post('/api/frontend/school/subjects', async c => {
       )
     `)
       .run()
-    
-    // 既存のテーブルにspecial_classroomとdescriptionカラムを追加（存在しない場合）
-    try {
-      await db.prepare(`ALTER TABLE subjects ADD COLUMN special_classroom TEXT`).run()
-    } catch (error) {
-      // カラムが既に存在する場合は無視
-    }
-    
-    try {
-      await db.prepare(`ALTER TABLE subjects ADD COLUMN description TEXT`).run()
-    } catch (error) {
-      // カラムが既に存在する場合は無視
-    }
-    
-    // テーブル構造を検証（PRAGMA table_info を使用してカラムの存在を確認）
-    const tableInfo = await db.prepare(`PRAGMA table_info(subjects)`).all()
-    const hasSpecialClassroom = tableInfo.results.some((col: any) => col.name === 'special_classroom')
-    const hasDescription = tableInfo.results.some((col: any) => col.name === 'description')
-    
-    if (!hasSpecialClassroom || !hasDescription) {
-      // カラムが存在しない場合は、テーブルを再作成
-      console.log('Recreating subjects table due to schema mismatch')
-      await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
-      await db.prepare(`
-        CREATE TABLE subjects (
-          id TEXT PRIMARY KEY,
-          school_id TEXT NOT NULL DEFAULT 'school-1',
-          name TEXT NOT NULL,
-          special_classroom TEXT,
-          description TEXT,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-      `).run()
-    }
     
     // 重複チェック
     const existing = await db
