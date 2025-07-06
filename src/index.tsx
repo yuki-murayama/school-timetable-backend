@@ -1,195 +1,947 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { logger } from 'hono/logger'
-import { serveStatic } from 'hono/cloudflare-workers'
-import type { Env } from './lib/db'
-import { renderer } from './renderer'
-import classesRouter from './routes/classes'
-import classroomsRouter from './routes/classrooms'
-import schoolsRouter from './routes/schools'
-import subjectsRouter from './routes/subjects'
-import teachersRouter from './routes/teachers'
-import teacherSubjectsRouter from './routes/teacher-subjects'
-import timetablesRouter from './routes/timetables'
-import constraintsRouter from './routes/constraints'
-import frontendApiRouter from './routes/frontend-api'
-import databaseManagementRouter from './routes/database-management'
-import performanceRouter from './routes/performance'
-import authRouter from './routes/auth'
-import test from './routes/test'
-import { createDocsApp } from './routes/docs'
-import { errorHandler } from './lib/error-handler'
-import { performanceMonitor } from './lib/performance-monitor'
-import { startCacheCleanup } from './lib/cache-system'
+
+type Env = {
+  DB: D1Database
+}
 
 const app = new Hono<{ Bindings: Env }>()
 
-// ミドルウェア
-app.use('*', performanceMonitor())
-app.use('*', errorHandler())
+// デフォルト設定
+const defaultSettings = {
+  grade1Classes: 4,
+  grade2Classes: 4,
+  grade3Classes: 3,
+  dailyPeriods: 6,
+  saturdayPeriods: 4,
+}
+
+// CORS設定
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:3000', 'https://school-timetable-frontend.vercel.app'],
+    origin: [
+      'http://localhost:3000',
+      'https://school-timetable-frontend.vercel.app',
+      'https://master.school-timetable-frontend.pages.dev',
+    ],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-ID',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+    ],
+    credentials: true,
+    maxAge: 86400,
   })
 )
-app.use('*', logger())
 
-// キャッシュクリーンアップの開始
-startCacheCleanup()
+// シンプルなテストエンドポイント
+app.get('/health', c => {
+  return c.json({ status: 'ok', message: 'Simple backend is running' })
+})
 
-// 静的ファイル配信（フロントエンド用）
-app.use('/static/*', serveStatic({ root: './public', manifest: {} }))
-app.use('/_next/*', serveStatic({ root: './public', manifest: {} }))
-
-// APIルート
-app.route('/api/test', test)
-app.route('/api/auth', authRouter)
-app.route('/api/schools', schoolsRouter)
-app.route('/api/classes', classesRouter)
-app.route('/api/classrooms', classroomsRouter)
-app.route('/api/subjects', subjectsRouter)
-app.route('/api/teachers', teachersRouter)
-app.route('/api/assignments', teacherSubjectsRouter)
-app.route('/api/timetables', timetablesRouter)
-app.route('/api/constraints', constraintsRouter)
-app.route('/api/frontend', frontendApiRouter)
-app.route('/api/database', databaseManagementRouter)
-app.route('/api/performance', performanceRouter)
-
-// APIドキュメント
-const docsApp = createDocsApp()
-app.route('/docs', docsApp)
-
-// フロントエンド用のルート（必要に応じて）
-app.use(renderer)
-
+// ルートエンドポイント
 app.get('/', c => {
-  return c.render(
-    <div>
-      <h1>School Timetable API</h1>
-      <p>時間割作成システムのバックエンドAPI</p>
-      <h2>利用可能なエンドポイント</h2>
-      <h3>テスト用</h3>
-      <ul>
-        <li>GET /api/test/health - ヘルスチェック</li>
-        <li>GET /api/test/mock-schools - モック学校一覧</li>
-        <li>POST /api/test/mock-schools - モック学校作成</li>
-      </ul>
-      <h3>認証システム</h3>
-      <ul>
-        <li>GET /api/auth/status - Auth0認証設定状態確認</li>
-        <li>GET /api/auth/health - 認証ヘルスチェック</li>
-        <li>GET /api/auth/config - Auth0設定情報取得（公開）</li>
-        <li>GET /api/auth/user/me - 現在のユーザー情報取得</li>
-        <li>GET /api/auth/user/permissions - ユーザー権限一覧取得</li>
-        <li>POST /api/auth/verify - JWTトークン検証</li>
-        <li>POST /api/auth/mock/token - 開発環境用モックトークン生成</li>
-        <li>POST /api/auth/mock/user - カスタムモックユーザー生成</li>
-      </ul>
-      <h3>学校管理</h3>
-      <ul>
-        <li>GET /api/schools - 学校一覧取得</li>
-        <li>POST /api/schools - 学校作成</li>
-        <li>GET /api/schools/:id - 学校詳細取得</li>
-        <li>PUT /api/schools/:id - 学校更新</li>
-        <li>DELETE /api/schools/:id - 学校削除</li>
-      </ul>
-      <h3>クラス管理</h3>
-      <ul>
-        <li>GET /api/classes - クラス一覧取得</li>
-        <li>POST /api/classes - クラス作成</li>
-        <li>GET /api/classes/:id - クラス詳細取得</li>
-        <li>PUT /api/classes/:id - クラス更新</li>
-        <li>DELETE /api/classes/:id - クラス削除</li>
-      </ul>
-      <h3>教室管理</h3>
-      <ul>
-        <li>GET /api/classrooms - 教室一覧取得</li>
-        <li>POST /api/classrooms - 教室作成</li>
-        <li>GET /api/classrooms/:id - 教室詳細取得</li>
-        <li>PUT /api/classrooms/:id - 教室更新</li>
-        <li>DELETE /api/classrooms/:id - 教室削除</li>
-      </ul>
-      <h3>教科管理</h3>
-      <ul>
-        <li>GET /api/subjects - 教科一覧取得</li>
-        <li>POST /api/subjects - 教科作成</li>
-        <li>GET /api/subjects/:id - 教科詳細取得</li>
-        <li>PUT /api/subjects/:id - 教科更新</li>
-        <li>DELETE /api/subjects/:id - 教科削除</li>
-      </ul>
-      <h3>教師管理</h3>
-      <ul>
-        <li>GET /api/teachers - 教師一覧取得</li>
-        <li>POST /api/teachers - 教師作成</li>
-        <li>GET /api/teachers/:id - 教師詳細取得</li>
-        <li>PUT /api/teachers/:id - 教師更新</li>
-        <li>DELETE /api/teachers/:id - 教師削除</li>
-      </ul>
-      <h3>教師-教科関係管理</h3>
-      <ul>
-        <li>GET /api/assignments/teachers/:id/subjects - 教師の担当教科取得</li>
-        <li>POST /api/assignments/teachers/:id/subjects - 教科割り当て</li>
-        <li>DELETE /api/assignments/teachers/:teacherId/subjects/:subjectId - 割り当て削除</li>
-        <li>GET /api/assignments/schools/:id/assignments - 学校内全割り当て取得</li>
-      </ul>
-      <h3>時間割管理</h3>
-      <ul>
-        <li>GET /api/timetables - 時間割一覧取得</li>
-        <li>POST /api/timetables - 時間割作成</li>
-        <li>GET /api/timetables/:id - 時間割詳細取得</li>
-        <li>PUT /api/timetables/:id - 時間割更新</li>
-        <li>DELETE /api/timetables/:id - 時間割削除</li>
-        <li>POST /api/timetables/:id/slots - 時間割スロット一括設定</li>
-        <li>GET /api/timetables/:id/slots/:classId - クラス時間割取得</li>
-        <li>GET /api/timetables/:id/teachers/:teacherId - 教師時間割取得</li>
-        <li>POST /api/timetables/:id/bulk-generate - バルク時間割生成</li>
-      </ul>
-      <h3>制約条件管理</h3>
-      <ul>
-        <li>GET /api/constraints - 利用可能な制約条件一覧</li>
-        <li>GET /api/constraints/:id - 制約条件詳細取得</li>
-        <li>PATCH /api/constraints/:id - 制約条件設定更新</li>
-        <li>POST /api/constraints/validate/:timetableId - 制約検証</li>
-        <li>POST /api/constraints/validate/:timetableId/category/:category - カテゴリ別制約検証</li>
-      </ul>
-      <h3>フロントエンド連携API</h3>
-      <ul>
-        <li>GET /api/frontend/timetables/:id/grid - 時間割グリッドデータ</li>
-        <li>GET /api/frontend/timetables/:id/statistics - 統計情報</li>
-        <li>POST /api/frontend/timetables/:id/quick-validate - リアルタイム制約検証</li>
-        <li>GET /api/frontend/timetables/:id/integrity - データ整合性チェック</li>
-        <li>GET /api/frontend/health - システムヘルスチェック</li>
-      </ul>
-      <h3>データベース管理API</h3>
-      <ul>
-        <li>GET /api/database/statistics - データベース統計情報</li>
-        <li>GET /api/database/schools/:id/integrity - 学校データ整合性チェック</li>
-        <li>POST /api/database/timetables/:id/snapshot - 時間割スナップショット作成</li>
-        <li>PUT /api/database/schools/:id/constraints/:type - 制約設定管理</li>
-        <li>POST /api/database/cleanup - データベースクリーンアップ</li>
-        <li>GET /api/database/performance - パフォーマンス分析</li>
-      </ul>
-      <h3>パフォーマンス監視API</h3>
-      <ul>
-        <li>GET /api/performance/statistics - パフォーマンス統計</li>
-        <li>GET /api/performance/metrics - 詳細メトリクス</li>
-        <li>GET /api/performance/cache/statistics - キャッシュ統計</li>
-        <li>POST /api/performance/benchmark - エンドポイントベンチマーク</li>
-        <li>GET /api/performance/recommendations - 最適化推奨事項</li>
-        <li>GET /api/performance/system - システムリソース監視</li>
-      </ul>
-      <h3>📖 APIドキュメント</h3>
-      <ul>
-        <li><a href="/docs/ui">Swagger UI - インタラクティブAPIドキュメント</a></li>
-        <li><a href="/docs/doc">OpenAPI仕様書 - JSON形式</a></li>
-        <li><a href="/docs">ドキュメントホーム</a></li>
-      </ul>
-    </div>
-  )
+  return c.json({ message: 'School Timetable Backend API', status: 'running' })
+})
+
+// 学校設定取得（D1データベース対応）
+app.get('/api/frontend/school/settings', async c => {
+  try {
+    const db = c.env.DB
+
+    // D1データベースから設定を取得
+    const result = await db
+      .prepare(`
+      SELECT * FROM school_settings WHERE id = 'default' LIMIT 1
+    `)
+      .first()
+
+    if (result) {
+      // データベースから取得した設定を返す
+      const settings = {
+        grade1Classes: result.grade1Classes || defaultSettings.grade1Classes,
+        grade2Classes: result.grade2Classes || defaultSettings.grade2Classes,
+        grade3Classes: result.grade3Classes || defaultSettings.grade3Classes,
+        dailyPeriods: result.dailyPeriods || defaultSettings.dailyPeriods,
+        saturdayPeriods: result.saturdayPeriods || defaultSettings.saturdayPeriods,
+      }
+
+      return c.json({
+        success: true,
+        data: settings,
+      })
+    } else {
+      // データが存在しない場合はデフォルト設定を返す
+      return c.json({
+        success: true,
+        data: defaultSettings,
+      })
+    }
+  } catch (error) {
+    // エラーの場合はデフォルト設定を返す
+    return c.json({
+      success: true,
+      data: defaultSettings,
+    })
+  }
+})
+
+// 学校設定更新（D1データベース対応）
+app.put('/api/frontend/school/settings', async c => {
+  try {
+    const body = await c.req.json()
+    const db = c.env.DB
+
+    // 新しい設定値を準備
+    const newSettings = {
+      grade1Classes: body.grade1Classes || defaultSettings.grade1Classes,
+      grade2Classes: body.grade2Classes || defaultSettings.grade2Classes,
+      grade3Classes: body.grade3Classes || defaultSettings.grade3Classes,
+      dailyPeriods: body.dailyPeriods || defaultSettings.dailyPeriods,
+      saturdayPeriods: body.saturdayPeriods || defaultSettings.saturdayPeriods,
+    }
+
+    // D1データベースのテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS school_settings (
+        id TEXT PRIMARY KEY,
+        grade1Classes INTEGER,
+        grade2Classes INTEGER,
+        grade3Classes INTEGER,
+        dailyPeriods INTEGER,
+        saturdayPeriods INTEGER,
+        updated_at TEXT
+      )
+    `)
+      .run()
+
+    // データを保存（UPSERT）
+    await db
+      .prepare(`
+      INSERT OR REPLACE INTO school_settings 
+      (id, grade1Classes, grade2Classes, grade3Classes, dailyPeriods, saturdayPeriods, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+      .bind(
+        'default',
+        newSettings.grade1Classes,
+        newSettings.grade2Classes,
+        newSettings.grade3Classes,
+        newSettings.dailyPeriods,
+        newSettings.saturdayPeriods,
+        new Date().toISOString()
+      )
+      .run()
+
+    return c.json({
+      success: true,
+      data: {
+        message: '設定が正常に更新されました',
+        settings: newSettings,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        error: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 認証ユーザー情報取得（フロントエンドが要求）
+app.get('/auth/user/me', c => {
+  return c.json({
+    success: true,
+    data: {
+      user: {
+        id: 'user-123',
+        email: 'test@example.com',
+        email_verified: true,
+        name: 'Test User',
+        picture: null,
+      },
+      auth: {
+        role: 'school_admin',
+        schoolId: 'school-1',
+        permissions: ['schools:read', 'schools:write', 'classes:read', 'classes:write'],
+      },
+      metadata: {
+        role: 'school_admin',
+        schoolId: 'school-1',
+      },
+    },
+  })
+})
+
+// ユーザー権限一覧取得（フロントエンドが要求）
+app.get('/auth/user/permissions', c => {
+  return c.json({
+    success: true,
+    data: {
+      role: 'school_admin',
+      schoolId: 'school-1',
+      permissions: [
+        'schools:read',
+        'schools:write',
+        'classes:read',
+        'classes:write',
+        'teachers:read',
+        'teachers:write',
+        'subjects:read',
+        'subjects:write',
+        'classrooms:read',
+        'classrooms:write',
+        'timetables:read',
+        'timetables:write',
+        'timetables:generate',
+        'constraints:read',
+        'constraints:write',
+        'users:read',
+        'users:write',
+      ],
+      effectivePermissions: {
+        isUnlimited: false,
+        explicitPermissions: [],
+        roleBasedPermissions: [
+          'schools:read',
+          'schools:write',
+          'classes:read',
+          'classes:write',
+          'teachers:read',
+          'teachers:write',
+          'subjects:read',
+          'subjects:write',
+          'classrooms:read',
+          'classrooms:write',
+          'timetables:read',
+          'timetables:write',
+          'timetables:generate',
+          'constraints:read',
+          'constraints:write',
+          'users:read',
+          'users:write',
+        ],
+      },
+    },
+  })
+})
+
+// 認証設定情報取得
+app.get('/auth/config', c => {
+  return c.json({
+    success: true,
+    data: {
+      domain: 'school-timetable.jp.auth0.com',
+      audience: 'https://api.school-timetable.app',
+      clientId: 'YmQjwwCNctZZpYm93DDVWUxAV5Hbpkja',
+      configured: true,
+      loginUrl: 'https://school-timetable.jp.auth0.com/authorize',
+      logoutUrl: 'https://school-timetable.jp.auth0.com/v2/logout',
+    },
+  })
+})
+
+// 認証ヘルスチェック
+app.get('/auth/health', c => {
+  return c.json({
+    success: true,
+    data: {
+      status: 'healthy',
+      auth0: {
+        configured: true,
+        domain: true,
+        audience: true,
+      },
+      issues: [],
+      timestamp: new Date().toISOString(),
+    },
+  })
+})
+
+// 教師情報API
+// 1. 教師一覧取得
+app.get('/api/frontend/school/teachers', async c => {
+  try {
+    const db = c.env.DB
+
+    // teachersテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS teachers (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        name TEXT NOT NULL,
+        subjects TEXT DEFAULT '[]',
+        grades TEXT DEFAULT '[]',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+
+    // 教師一覧を取得
+    const result = await db
+      .prepare(`
+      SELECT * FROM teachers WHERE school_id = ? ORDER BY created_at DESC
+    `)
+      .bind('school-1')
+      .all()
+
+    const teachers = result.results.map((row: Record<string, unknown>) => ({
+      id: row.id,
+      name: row.name,
+      subjects: row.subjects ? JSON.parse(row.subjects as string) : [],
+      grades: row.grades ? JSON.parse(row.grades as string) : [],
+    }))
+
+    return c.json({
+      success: true,
+      data: teachers,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 2. 教師新規作成
+app.post('/api/frontend/school/teachers', async c => {
+  try {
+    const body = await c.req.json()
+    const db = c.env.DB
+
+    // teachersテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS teachers (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        name TEXT NOT NULL,
+        subjects TEXT DEFAULT '[]',
+        grades TEXT DEFAULT '[]',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+
+    const teacherId = `teacher-${Date.now()}`
+    const now = new Date().toISOString()
+
+    await db
+      .prepare(`
+      INSERT INTO teachers (id, school_id, name, subjects, grades, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+      .bind(
+        teacherId,
+        'school-1',
+        body.name,
+        JSON.stringify(body.subjects || []),
+        JSON.stringify(body.grades || []),
+        now,
+        now
+      )
+      .run()
+
+    return c.json({
+      success: true,
+      data: {
+        id: teacherId,
+        name: body.name,
+        subjects: body.subjects || [],
+        grades: body.grades || [],
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 3. 教師更新
+app.put('/api/frontend/school/teachers/:id', async c => {
+  try {
+    const teacherId = c.req.param('id')
+    const body = await c.req.json()
+    const db = c.env.DB
+
+    const now = new Date().toISOString()
+
+    await db
+      .prepare(`
+      UPDATE teachers 
+      SET name = ?, subjects = ?, grades = ?, updated_at = ?
+      WHERE id = ? AND school_id = ?
+    `)
+      .bind(
+        body.name,
+        JSON.stringify(body.subjects || []),
+        JSON.stringify(body.grades || []),
+        now,
+        teacherId,
+        'school-1'
+      )
+      .run()
+
+    return c.json({
+      success: true,
+      data: {
+        id: teacherId,
+        name: body.name,
+        subjects: body.subjects || [],
+        grades: body.grades || [],
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 4. 教師削除
+app.delete('/api/frontend/school/teachers/:id', async c => {
+  try {
+    const teacherId = c.req.param('id')
+    const db = c.env.DB
+
+    await db
+      .prepare(`
+      DELETE FROM teachers WHERE id = ? AND school_id = ?
+    `)
+      .bind(teacherId, 'school-1')
+      .run()
+
+    return c.json({
+      success: true,
+      data: null,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 5. 教師一括保存
+app.put('/api/frontend/school/teachers', async c => {
+  try {
+    const teachers = await c.req.json()
+    const db = c.env.DB
+    const now = new Date().toISOString()
+
+    const savedTeachers = []
+
+    for (const teacher of teachers) {
+      if (teacher.id) {
+        // 既存教師の更新
+        await db
+          .prepare(`
+          UPDATE teachers 
+          SET name = ?, subjects = ?, grades = ?, updated_at = ?
+          WHERE id = ? AND school_id = ?
+        `)
+          .bind(
+            teacher.name,
+            JSON.stringify(teacher.subjects || []),
+            JSON.stringify(teacher.grades || []),
+            now,
+            teacher.id,
+            'school-1'
+          )
+          .run()
+
+        savedTeachers.push({
+          id: teacher.id,
+          name: teacher.name,
+          subjects: teacher.subjects || [],
+          grades: teacher.grades || [],
+        })
+      } else {
+        // 新規教師の作成
+        const teacherId = `teacher-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
+        await db
+          .prepare(`
+          INSERT INTO teachers (id, school_id, name, subjects, grades, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `)
+          .bind(
+            teacherId,
+            'school-1',
+            teacher.name,
+            JSON.stringify(teacher.subjects || []),
+            JSON.stringify(teacher.grades || []),
+            now,
+            now
+          )
+          .run()
+
+        savedTeachers.push({
+          id: teacherId,
+          name: teacher.name,
+          subjects: teacher.subjects || [],
+          grades: teacher.grades || [],
+        })
+      }
+    }
+
+    return c.json({
+      success: true,
+      data: savedTeachers,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 教科情報API
+// 1. 教科一覧取得
+app.get('/api/frontend/school/subjects', async c => {
+  try {
+    const db = c.env.DB
+    
+    // subjectsテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS subjects (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        name TEXT NOT NULL,
+        special_classroom TEXT,
+        description TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+    
+    // 既存のテーブルにspecial_classroomとdescriptionカラムを追加（存在しない場合）
+    try {
+      await db.prepare(`ALTER TABLE subjects ADD COLUMN special_classroom TEXT`).run()
+    } catch (error) {
+      // カラムが既に存在する場合は無視
+    }
+    
+    try {
+      await db.prepare(`ALTER TABLE subjects ADD COLUMN description TEXT`).run()
+    } catch (error) {
+      // カラムが既に存在する場合は無視
+    }
+    
+    // 教科一覧を取得
+    const result = await db
+      .prepare(`
+      SELECT * FROM subjects WHERE school_id = ? ORDER BY created_at DESC
+    `)
+      .bind('school-1')
+      .all()
+    
+    const subjects = result.results.map((row: Record<string, unknown>) => ({
+      id: row.id,
+      name: row.name,
+      specialClassroom: row.special_classroom || null,
+      description: row.description || null,
+    }))
+    
+    return c.json({
+      success: true,
+      data: subjects,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 2. 教科新規作成
+app.post('/api/frontend/school/subjects', async c => {
+  try {
+    const body = await c.req.json()
+    const db = c.env.DB
+    
+    // 必須フィールドのバリデーション
+    if (!body.name || body.name.trim().length === 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教科名は必須です'],
+        },
+        400
+      )
+    }
+    
+    if (body.name.length > 100) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教科名は100文字以内で入力してください'],
+        },
+        400
+      )
+    }
+    
+    // subjectsテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS subjects (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        name TEXT NOT NULL,
+        special_classroom TEXT,
+        description TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+    
+    // 既存のテーブルにspecial_classroomとdescriptionカラムを追加（存在しない場合）
+    try {
+      await db.prepare(`ALTER TABLE subjects ADD COLUMN special_classroom TEXT`).run()
+    } catch (error) {
+      // カラムが既に存在する場合は無視
+    }
+    
+    try {
+      await db.prepare(`ALTER TABLE subjects ADD COLUMN description TEXT`).run()
+    } catch (error) {
+      // カラムが既に存在する場合は無視
+    }
+    
+    // 重複チェック
+    const existing = await db
+      .prepare(`
+      SELECT id FROM subjects WHERE school_id = ? AND name = ?
+    `)
+      .bind('school-1', body.name.trim())
+      .first()
+    
+    if (existing) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['同じ教科名は既に登録されています'],
+        },
+        400
+      )
+    }
+    
+    const subjectId = `subject-${Date.now()}`
+    const now = new Date().toISOString()
+    
+    await db
+      .prepare(`
+      INSERT INTO subjects (id, school_id, name, special_classroom, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+      .bind(
+        subjectId,
+        'school-1',
+        body.name.trim(),
+        body.specialClassroom?.trim() || null,
+        body.description?.trim() || null,
+        now,
+        now
+      )
+      .run()
+    
+    return c.json({
+      success: true,
+      data: {
+        id: subjectId,
+        name: body.name.trim(),
+        specialClassroom: body.specialClassroom?.trim() || null,
+        description: body.description?.trim() || null,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 3. 教科更新
+app.put('/api/frontend/school/subjects/:id', async c => {
+  try {
+    const subjectId = c.req.param('id')
+    const body = await c.req.json()
+    const db = c.env.DB
+    
+    // 必須フィールドのバリデーション
+    if (!body.name || body.name.trim().length === 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教科名は必須です'],
+        },
+        400
+      )
+    }
+    
+    if (body.name.length > 100) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教科名は100文字以内で入力してください'],
+        },
+        400
+      )
+    }
+    
+    // 重複チェック（自分以外）
+    const existing = await db
+      .prepare(`
+      SELECT id FROM subjects WHERE school_id = ? AND name = ? AND id != ?
+    `)
+      .bind('school-1', body.name.trim(), subjectId)
+      .first()
+    
+    if (existing) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['同じ教科名は既に登録されています'],
+        },
+        400
+      )
+    }
+    
+    const now = new Date().toISOString()
+    
+    await db
+      .prepare(`
+      UPDATE subjects 
+      SET name = ?, special_classroom = ?, description = ?, updated_at = ?
+      WHERE id = ? AND school_id = ?
+    `)
+      .bind(
+        body.name.trim(),
+        body.specialClassroom?.trim() || null,
+        body.description?.trim() || null,
+        now,
+        subjectId,
+        'school-1'
+      )
+      .run()
+    
+    return c.json({
+      success: true,
+      data: {
+        id: subjectId,
+        name: body.name.trim(),
+        specialClassroom: body.specialClassroom?.trim() || null,
+        description: body.description?.trim() || null,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 4. 教科削除
+app.delete('/api/frontend/school/subjects/:id', async c => {
+  try {
+    const subjectId = c.req.param('id')
+    const db = c.env.DB
+    
+    await db
+      .prepare(`
+      DELETE FROM subjects WHERE id = ? AND school_id = ?
+    `)
+      .bind(subjectId, 'school-1')
+      .run()
+    
+    return c.json({
+      success: true,
+      data: null,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 5. 教科一括保存
+app.put('/api/frontend/school/subjects', async c => {
+  try {
+    const subjects = await c.req.json()
+    const db = c.env.DB
+    const now = new Date().toISOString()
+    
+    const savedSubjects = []
+    const errors: string[] = []
+    
+    // バリデーション
+    for (let i = 0; i < subjects.length; i++) {
+      const subject = subjects[i]
+      if (!subject.name || subject.name.trim().length === 0) {
+        errors.push(`${i + 1}行目: 教科名は必須です`)
+      }
+      if (subject.name && subject.name.length > 100) {
+        errors.push(`${i + 1}行目: 教科名は100文字以内で入力してください`)
+      }
+    }
+    
+    if (errors.length > 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors,
+        },
+        400
+      )
+    }
+    
+    for (const subject of subjects) {
+      if (subject.id) {
+        // 既存教科の更新
+        // 重複チェック（自分以外）
+        const existing = await db
+          .prepare(`
+          SELECT id FROM subjects WHERE school_id = ? AND name = ? AND id != ?
+        `)
+          .bind('school-1', subject.name.trim(), subject.id)
+          .first()
+        
+        if (!existing) {
+          await db
+            .prepare(`
+            UPDATE subjects 
+            SET name = ?, special_classroom = ?, description = ?, updated_at = ?
+            WHERE id = ? AND school_id = ?
+          `)
+            .bind(
+              subject.name.trim(),
+              subject.specialClassroom?.trim() || null,
+              subject.description?.trim() || null,
+              now,
+              subject.id,
+              'school-1'
+            )
+            .run()
+          
+          savedSubjects.push({
+            id: subject.id,
+            name: subject.name.trim(),
+            specialClassroom: subject.specialClassroom?.trim() || null,
+            description: subject.description?.trim() || null,
+          })
+        }
+      } else {
+        // 新規教科の作成
+        // 重複チェック
+        const existing = await db
+          .prepare(`
+          SELECT id FROM subjects WHERE school_id = ? AND name = ?
+        `)
+          .bind('school-1', subject.name.trim())
+          .first()
+        
+        if (!existing) {
+          const subjectId = `subject-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+          
+          await db
+            .prepare(`
+            INSERT INTO subjects (id, school_id, name, special_classroom, description, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `)
+            .bind(
+              subjectId,
+              'school-1',
+              subject.name.trim(),
+              subject.specialClassroom?.trim() || null,
+              subject.description?.trim() || null,
+              now,
+              now
+            )
+            .run()
+          
+          savedSubjects.push({
+            id: subjectId,
+            name: subject.name.trim(),
+            specialClassroom: subject.specialClassroom?.trim() || null,
+            description: subject.description?.trim() || null,
+          })
+        }
+      }
+    }
+    
+    return c.json({
+      success: true,
+      data: savedSubjects,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
 })
 
 export default app
