@@ -563,11 +563,13 @@ app.get('/api/frontend/school/subjects', async c => {
       // カラムが既に存在する場合は無視
     }
     
-    // テーブル構造を検証（テスト用に少し待つ）
-    try {
-      await db.prepare(`SELECT special_classroom, description FROM subjects LIMIT 1`).all()
-    } catch (error) {
-      // もしまだカラムが存在しない場合は、テーブルを再作成
+    // テーブル構造を検証（PRAGMA table_info を使用してカラムの存在を確認）
+    const tableInfo = await db.prepare(`PRAGMA table_info(subjects)`).all()
+    const hasSpecialClassroom = tableInfo.results.some((col: any) => col.name === 'special_classroom')
+    const hasDescription = tableInfo.results.some((col: any) => col.name === 'description')
+    
+    if (!hasSpecialClassroom || !hasDescription) {
+      // カラムが存在しない場合は、テーブルを再作成
       console.log('Recreating subjects table due to schema mismatch')
       await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
       await db.prepare(`
@@ -670,11 +672,13 @@ app.post('/api/frontend/school/subjects', async c => {
       // カラムが既に存在する場合は無視
     }
     
-    // テーブル構造を検証（テスト用に少し待つ）
-    try {
-      await db.prepare(`SELECT special_classroom, description FROM subjects LIMIT 1`).all()
-    } catch (error) {
-      // もしまだカラムが存在しない場合は、テーブルを再作成
+    // テーブル構造を検証（PRAGMA table_info を使用してカラムの存在を確認）
+    const tableInfo = await db.prepare(`PRAGMA table_info(subjects)`).all()
+    const hasSpecialClassroom = tableInfo.results.some((col: any) => col.name === 'special_classroom')
+    const hasDescription = tableInfo.results.some((col: any) => col.name === 'description')
+    
+    if (!hasSpecialClassroom || !hasDescription) {
+      // カラムが存在しない場合は、テーブルを再作成
       console.log('Recreating subjects table due to schema mismatch')
       await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
       await db.prepare(`
