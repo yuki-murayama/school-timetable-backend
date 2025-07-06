@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth0認証テスト</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .button { padding: 10px 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .result { background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 5px; white-space: pre-wrap; font-family: monospace; }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .info { border-left: 4px solid #17a2b8; }
+        h1 { color: #333; }
+        h2 { color: #555; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .config { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status.online { background: #d4edda; border: 1px solid #c3e6cb; }
+        .status.offline { background: #f8d7da; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Auth0認証テスト</h1>
+        
+        <div class="config">
+            <h3>📋 現在の設定</h3>
+            <p><strong>Domain:</strong> school-timetable.jp.auth0.com</p>
+            <p><strong>Client ID:</strong> YmQjwwCNctZZpYm93DDVWUxAV5Hbpkja</p>
+            <p><strong>Audience:</strong> https://api.school-timetable.app</p>
+            <p><strong>API Base:</strong> http://localhost:3002</p>
+        </div>
+
+        <div id="serverStatus" class="status offline">
+            <strong>サーバー状態:</strong> <span id="statusText">確認中...</span>
+        </div>
+        
+        <h2>1. モック認証テスト</h2>
+        <button class="button" onclick="testMockAuth()">モック認証テスト</button>
+        <div id="mockResult" class="result info" style="display:none;"></div>
+        
+        <h2>2. Auth0ログイン（シンプル版）</h2>
+        <button class="button" onclick="simpleAuth0Login()">Auth0ログインページを開く</button>
+        <div class="config">
+            <p><strong>手動テスト手順:</strong></p>
+            <ol>
+                <li>上のボタンでAuth0ログインページを開く</li>
+                <li>ログイン後、URLからアクセストークンをコピー</li>
+                <li>下の入力欄にペーストしてテスト</li>
+            </ol>
+            <input type="text" id="manualToken" placeholder="JWT トークンをここに貼り付け" style="width: 100%; padding: 10px; margin: 10px 0;">
+            <button class="button" onclick="testManualToken()">手動トークンでテスト</button>
+        </div>
+        <div id="authResult" class="result info" style="display:none;"></div>
+        
+        <h2>3. API認証テスト</h2>
+        <button class="button" onclick="testWithCurrentToken()">現在のトークンでAPIテスト</button>
+        <div id="apiResult" class="result info" style="display:none;"></div>
+        
+        <h2>4. ユーザー情報</h2>
+        <button class="button" onclick="getUserInfo()">ユーザー情報取得</button>
+        <div id="userResult" class="result info" style="display:none;"></div>
+        
+        <h2>📱 ログ</h2>
+        <div id="logs" class="result"></div>
+    </div>
+
+    <script>
+        // グローバル変数
+        const API_BASE = 'http://localhost:3002';
+        let currentAccessToken = null;
+        
+        // Auth0設定
+        const AUTH0_CONFIG = {
+            domain: 'school-timetable.jp.auth0.com',
+            clientId: 'YmQjwwCNctZZpYm93DDVWUxAV5Hbpkja',
+            audience: 'https://api.school-timetable.app'
+        };
+        
+        // ログ関数
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        // サーバー状態確認
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/test`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    document.getElementById('serverStatus').className = 'status online';
+                    document.getElementById('statusText').textContent = 'オンライン ✅';
+                    log('✅ サーバー接続確認 - オンライン');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                document.getElementById('serverStatus').className = 'status offline';
+                document.getElementById('statusText').textContent = `オフライン ❌ (${error.message})`;
+                log('❌ サーバー接続エラー: ' + error.message);
+            }
+        }
+        
+        // モック認証テスト
+        async function testMockAuth() {
+            log('🎭 モック認証テスト開始...');
+            const result = document.getElementById('mockResult');
+            result.style.display = 'block';
+            result.className = 'result info';
+            result.textContent = '認証テスト中...';
+            
+            try {
+                log('📡 APIリクエスト送信中: ' + `${API_BASE}/api/auth/mock/token`);
+                
+                // モックトークン取得
+                const response = await fetch(`${API_BASE}/api/auth/mock/token`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                log(`📡 レスポンス受信: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                log('📦 JSONデータ受信: ' + JSON.stringify(data));
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ モック認証成功');
+                    
+                    // モックトークンを設定
+                    currentAccessToken = 'mock';
+                    log('🔑 アクセストークン設定: mock');
+                    
+                    // モックトークンでユーザー情報取得テスト
+                    const userResponse = await fetch(`${API_BASE}/api/auth/user/me`, {
+                        headers: { 'Authorization': 'Bearer mock' }
+                    });
+                    
+                    if (userResponse.ok) {
+                        const userData = await userResponse.json();
+                        log('👤 モックユーザー情報取得成功');
+                        console.log('User data:', userData);
+                    } else {
+                        log('⚠️ ユーザー情報取得は失敗しましたが、トークン生成は成功');
+                    }
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ モック認証失敗: ' + data.message);
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}\n\nCORSエラーの可能性があります。サーバーが正常に起動しているか確認してください。`;
+                log('❌ モック認証エラー: ' + error.message);
+                console.error('詳細エラー:', error);
+            }
+        }
+        
+        // シンプルなAuth0ログイン（新しいタブで開く）
+        function simpleAuth0Login() {
+            // コールバックURLを明示的に設定
+            const callbackUrl = `${window.location.protocol}//${window.location.host}/callback`;
+            
+            const authUrl = `https://${AUTH0_CONFIG.domain}/authorize?` +
+                `response_type=token&` +
+                `client_id=${AUTH0_CONFIG.clientId}&` +
+                `audience=${encodeURIComponent(AUTH0_CONFIG.audience)}&` +
+                `scope=openid%20profile%20email&` +
+                `redirect_uri=${encodeURIComponent(callbackUrl)}&` +
+                `state=${Math.random().toString(36).substring(2)}`;
+            
+            log('🔑 Auth0ログインページを開きます...');
+            log('Callback URL: ' + callbackUrl);
+            log('Auth URL: ' + authUrl);
+            
+            // より確実にウィンドウを開く
+            const authWindow = window.open(authUrl, '_blank', 'width=500,height=600,scrollbars=yes,resizable=yes');
+            
+            if (!authWindow) {
+                log('❌ ポップアップがブロックされました。ブラウザのポップアップブロックを無効にしてください。');
+            } else {
+                log('✅ Auth0ログインウィンドウを開きました');
+            }
+        }
+        
+        // 手動トークンテスト
+        async function testManualToken() {
+            const token = document.getElementById('manualToken').value.trim();
+            
+            if (!token) {
+                log('❌ トークンを入力してください');
+                return;
+            }
+            
+            log('🧪 手動トークンテスト開始...');
+            currentAccessToken = token;
+            
+            const result = document.getElementById('authResult');
+            result.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ JWT認証成功');
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ JWT認証失敗');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}`;
+                log('❌ 手動トークンテストエラー: ' + error.message);
+            }
+        }
+        
+        // 現在のトークンでAPIテスト
+        async function testWithCurrentToken() {
+            if (!currentAccessToken) {
+                log('❌ 先にモック認証またはAuth0ログインを実行してください');
+                return;
+            }
+            
+            log('🧪 現在のトークンでAPIテスト開始...');
+            const result = document.getElementById('apiResult');
+            result.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentAccessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ JWT認証成功');
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ JWT認証失敗');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}`;
+                log('❌ APIテストエラー: ' + error.message);
+            }
+        }
+        
+        // ユーザー情報取得
+        async function getUserInfo() {
+            if (!currentAccessToken) {
+                log('❌ 先にモック認証またはAuth0ログインを実行してください');
+                return;
+            }
+            
+            log('👤 ユーザー情報取得開始...');
+            const result = document.getElementById('userResult');
+            result.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/user/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentAccessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ ユーザー情報取得成功');
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ ユーザー情報取得失敗');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}`;
+                log('❌ ユーザー情報取得エラー: ' + error.message);
+            }
+        }
+        
+        // ページ読み込み時の初期化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 認証テストページ初期化完了');
+            checkServerStatus();
+            
+            // 定期的にサーバー状態をチェック
+            setInterval(checkServerStatus, 30000); // 30秒ごと
+        });
+        
+        // URLからトークンを自動取得（Auth0リダイレクト後）
+        function extractTokenFromUrl() {
+            const hash = window.location.hash;
+            if (hash.includes('access_token=')) {
+                const tokenMatch = hash.match(/access_token=([^&]+)/);
+                if (tokenMatch) {
+                    const token = tokenMatch[1];
+                    document.getElementById('manualToken').value = token;
+                    currentAccessToken = token;
+                    log('🎉 URLからアクセストークンを自動取得しました');
+                    return token;
+                }
+            }
+            return null;
+        }
+        
+        // ページ読み込み時にURLからトークンを確認
+        window.addEventListener('load', function() {
+            extractTokenFromUrl();
+        });
+    </script>
+</body>
+</html>

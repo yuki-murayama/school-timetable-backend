@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth0認証テスト</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .button { padding: 10px 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .button:hover { background: #0056b3; }
+        .result { background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 5px; white-space: pre-wrap; font-family: monospace; }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .info { border-left: 4px solid #17a2b8; }
+        h1 { color: #333; }
+        h2 { color: #555; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .config { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+    <script src="https://cdn.auth0.com/js/auth0/9.20.2/auth0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Auth0認証テスト</h1>
+        
+        <div class="config">
+            <h3>📋 現在の設定</h3>
+            <p><strong>Domain:</strong> school-timetable.jp.auth0.com</p>
+            <p><strong>Client ID:</strong> YmQjwwCNctZZpYm93DDVWUxAV5Hbpkja</p>
+            <p><strong>Audience:</strong> https://api.school-timetable.app</p>
+        </div>
+        
+        <h2>1. モック認証テスト</h2>
+        <button class="button" onclick="testMockAuth()">モック認証テスト</button>
+        <div id="mockResult" class="result info" style="display:none;"></div>
+        
+        <h2>2. Auth0ログイン（実際の認証）</h2>
+        <button class="button" onclick="login()">Auth0でログイン</button>
+        <button class="button" onclick="logout()">ログアウト</button>
+        <div id="authResult" class="result info" style="display:none;"></div>
+        
+        <h2>3. API認証テスト</h2>
+        <button class="button" onclick="testWithToken()">JWTトークンでAPIテスト</button>
+        <div id="apiResult" class="result info" style="display:none;"></div>
+        
+        <h2>4. ユーザー情報</h2>
+        <button class="button" onclick="getUserInfo()">ユーザー情報取得</button>
+        <div id="userResult" class="result info" style="display:none;"></div>
+        
+        <h2>📱 ログ</h2>
+        <div id="logs" class="result"></div>
+    </div>
+
+    <script>
+        // API Base URL - 認証テストサーバー
+        const API_BASE = 'http://localhost:3001';
+        
+        // Auth0設定
+        const auth0 = new Auth0Lock('YmQjwwCNctZZpYm93DDVWUxAV5Hbpkja', 'school-timetable.jp.auth0.com', {
+            audience: 'https://api.school-timetable.app',
+            responseType: 'token id_token',
+            scope: 'openid profile email'
+        });
+        
+        let accessToken = null;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        // モック認証テスト
+        async function testMockAuth() {
+            log('🎭 モック認証テスト開始...');
+            const result = document.getElementById('mockResult');
+            result.style.display = 'block';
+            
+            try {
+                // モックトークン取得
+                const response = await fetch(`${API_BASE}/api/auth/mock/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ モック認証成功');
+                    
+                    // モックトークンでユーザー情報取得テスト
+                    const userResponse = await fetch(`${API_BASE}/api/auth/user/me`, {
+                        headers: { 'Authorization': 'Bearer mock' }
+                    });
+                    const userData = await userResponse.json();
+                    log('👤 モックユーザー情報: ' + JSON.stringify(userData.data, null, 2));
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ モック認証失敗');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}`;
+                log('❌ モック認証エラー: ' + error.message);
+            }
+        }
+        
+        // Auth0ログイン
+        function login() {
+            log('🔑 Auth0ログイン開始...');
+            auth0.show();
+        }
+        
+        // ログアウト
+        function logout() {
+            accessToken = null;
+            log('👋 ログアウト');
+            document.getElementById('authResult').style.display = 'none';
+            document.getElementById('apiResult').style.display = 'none';
+            document.getElementById('userResult').style.display = 'none';
+        }
+        
+        // JWTトークンでAPIテスト
+        async function testWithToken() {
+            if (!accessToken) {
+                log('❌ 先にログインしてください');
+                return;
+            }
+            
+            log('🧪 JWTトークンでAPIテスト開始...');
+            const result = document.getElementById('apiResult');
+            result.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ JWT認証成功');
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ JWT認証失敗');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}`;
+                log('❌ APIテストエラー: ' + error.message);
+            }
+        }
+        
+        // ユーザー情報取得
+        async function getUserInfo() {
+            if (!accessToken) {
+                log('❌ 先にログインしてください');
+                return;
+            }
+            
+            log('👤 ユーザー情報取得開始...');
+            const result = document.getElementById('userResult');
+            result.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/user/me`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('✅ ユーザー情報取得成功');
+                } else {
+                    result.className = 'result error';
+                    result.textContent = JSON.stringify(data, null, 2);
+                    log('❌ ユーザー情報取得失敗');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = `エラー: ${error.message}`;
+                log('❌ ユーザー情報取得エラー: ' + error.message);
+            }
+        }
+        
+        // Auth0認証結果処理
+        auth0.on('authenticated', function(authResult) {
+            accessToken = authResult.accessToken;
+            log('🎉 Auth0ログイン成功！');
+            log('🔑 アクセストークン取得: ' + accessToken.substring(0, 50) + '...');
+            
+            const result = document.getElementById('authResult');
+            result.style.display = 'block';
+            result.className = 'result success';
+            result.textContent = `ログイン成功！\nアクセストークン: ${accessToken.substring(0, 100)}...\n\n認証結果:\n${JSON.stringify(authResult, null, 2)}`;
+        });
+        
+        auth0.on('authorization_error', function(error) {
+            log('❌ Auth0ログインエラー: ' + error.error_description);
+            const result = document.getElementById('authResult');
+            result.style.display = 'block';
+            result.className = 'result error';
+            result.textContent = `ログインエラー: ${error.error_description}`;
+        });
+        
+        // 初期化
+        log('🚀 認証テストページ初期化完了');
+    </script>
+</body>
+</html>

@@ -6,15 +6,42 @@
     "build": "vite build",
     "preview": "$npm_execpath run build && vite preview",
     "deploy": "$npm_execpath run build && wrangler deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "drizzle-kit migrate",
+    "db:up": "drizzle-kit up",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "check": "biome check . && tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.8.3"
+    "@hono/swagger-ui": "^0.5.0",
+    "@hono/zod-openapi": "^0.19.1",
+    "@hono/zod-validator": "^0.7.0",
+    "@paralleldrive/cuid2": "^2.2.2",
+    "drizzle-orm": "^0.44.2",
+    "hono": "^4.8.3",
+    "jose": "^5.9.6",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-client": "^2.0.5",
+    "zod": "^3.25.73"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.0.6",
     "@cloudflare/vite-plugin": "^1.2.3",
+    "@cloudflare/workers-types": "^4.20250704.0",
+    "drizzle-kit": "^0.31.4",
+    "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vite-ssr-components": "^0.3.0",
+    "vitest": "^3.2.4",
     "wrangler": "^4.17.0"
   }
 }
