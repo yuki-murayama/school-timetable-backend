@@ -563,6 +563,26 @@ app.get('/api/frontend/school/subjects', async c => {
       // カラムが既に存在する場合は無視
     }
     
+    // テーブル構造を検証（テスト用に少し待つ）
+    try {
+      await db.prepare(`SELECT special_classroom, description FROM subjects LIMIT 1`).all()
+    } catch (error) {
+      // もしまだカラムが存在しない場合は、テーブルを再作成
+      console.log('Recreating subjects table due to schema mismatch')
+      await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
+      await db.prepare(`
+        CREATE TABLE subjects (
+          id TEXT PRIMARY KEY,
+          school_id TEXT NOT NULL DEFAULT 'school-1',
+          name TEXT NOT NULL,
+          special_classroom TEXT,
+          description TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+    }
+    
     // 教科一覧を取得
     const result = await db
       .prepare(`
@@ -574,8 +594,8 @@ app.get('/api/frontend/school/subjects', async c => {
     const subjects = result.results.map((row: Record<string, unknown>) => ({
       id: row.id,
       name: row.name,
-      specialClassroom: row.special_classroom || null,
-      description: row.description || null,
+      specialClassroom: (row.special_classroom !== undefined ? row.special_classroom : null),
+      description: (row.description !== undefined ? row.description : null),
     }))
     
     return c.json({
@@ -648,6 +668,26 @@ app.post('/api/frontend/school/subjects', async c => {
       await db.prepare(`ALTER TABLE subjects ADD COLUMN description TEXT`).run()
     } catch (error) {
       // カラムが既に存在する場合は無視
+    }
+    
+    // テーブル構造を検証（テスト用に少し待つ）
+    try {
+      await db.prepare(`SELECT special_classroom, description FROM subjects LIMIT 1`).all()
+    } catch (error) {
+      // もしまだカラムが存在しない場合は、テーブルを再作成
+      console.log('Recreating subjects table due to schema mismatch')
+      await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
+      await db.prepare(`
+        CREATE TABLE subjects (
+          id TEXT PRIMARY KEY,
+          school_id TEXT NOT NULL DEFAULT 'school-1',
+          name TEXT NOT NULL,
+          special_classroom TEXT,
+          description TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
     }
     
     // 重複チェック
