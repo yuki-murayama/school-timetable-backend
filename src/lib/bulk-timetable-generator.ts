@@ -3,13 +3,16 @@
  * 複数クラスの統合時間割をGemini APIで生成
  */
 
-import { eq, inArray, and } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { DrizzleDb } from '../db'
 import { schedules, timetables } from '../db/schema'
-import { generateTimetableWithGemini, validateGeminiApiKey } from './gemini'
-import { getBulkTimetableGenerationData, generateBulkTimetablePrompt } from './bulk-timetable-prompt'
-import { validateGeneratedTimetable, validateTimetableStructure } from './timetable-validator'
+import {
+  generateBulkTimetablePrompt,
+  getBulkTimetableGenerationData,
+} from './bulk-timetable-prompt'
 import { validateTimetableConstraints } from './constraints/manager'
+import { generateTimetableWithGemini, validateGeminiApiKey } from './gemini'
+import { validateGeneratedTimetable, validateTimetableStructure } from './timetable-validator'
 import type { BulkGenerateTimetableInput } from './validation'
 
 interface BulkGenerationResult {
@@ -41,7 +44,7 @@ export async function generateBulkTimetable(
     return {
       success: false,
       error: 'INVALID_API_KEY',
-      message: 'Gemini API キーが無効です'
+      message: 'Gemini API キーが無効です',
     }
   }
 
@@ -51,7 +54,7 @@ export async function generateBulkTimetable(
     return {
       success: false,
       error: 'TIMETABLE_NOT_FOUND',
-      message: '時間割データが見つかりません'
+      message: '時間割データが見つかりません',
     }
   }
 
@@ -62,7 +65,7 @@ export async function generateBulkTimetable(
     return {
       success: false,
       error: 'CLASS_NOT_FOUND',
-      message: `指定されたクラスが見つかりません: ${missingClassIds.join(', ')}`
+      message: `指定されたクラスが見つかりません: ${missingClassIds.join(', ')}`,
     }
   }
 
@@ -70,28 +73,25 @@ export async function generateBulkTimetable(
   const saturdayHours = timetableData.timetable.saturdayHours
 
   // 指定クラスの既存スケジュールを削除
-  await db.delete(schedules).where(
-    and(
-      eq(schedules.timetableId, timetableId),
-      inArray(schedules.classId, classIds)
-    )
-  )
+  await db
+    .delete(schedules)
+    .where(and(eq(schedules.timetableId, timetableId), inArray(schedules.classId, classIds)))
 
   try {
     console.log(`バルク時間割生成開始: ${classIds.length}クラス`)
 
     // プロンプトの生成
     const prompt = generateBulkTimetablePrompt(timetableData, input)
-    
+
     // Gemini API での生成
     const geminiResult = await generateTimetableWithGemini(prompt, geminiApiKey, priority)
-    
+
     if (!geminiResult.success) {
       return {
         success: false,
         error: geminiResult.error || 'GEMINI_API_ERROR',
         message: geminiResult.message,
-        retryable: geminiResult.retryable
+        retryable: geminiResult.retryable,
       }
     }
 
@@ -101,7 +101,7 @@ export async function generateBulkTimetable(
         success: false,
         error: 'INVALID_STRUCTURE',
         message: '生成されたデータ構造が無効です',
-        retryable: true
+        retryable: true,
       }
     }
 
@@ -118,9 +118,7 @@ export async function generateBulkTimetable(
       )
 
       if (!classValidationResult.isValid) {
-        validationErrors.push(
-          `クラス ${classId}: ${classValidationResult.errors.join(', ')}`
-        )
+        validationErrors.push(`クラス ${classId}: ${classValidationResult.errors.join(', ')}`)
       }
     }
 
@@ -131,17 +129,17 @@ export async function generateBulkTimetable(
       geminiResult.data.schedules,
       {
         schoolId,
-        saturdayHours
+        saturdayHours,
       }
     )
-    
+
     if (!constraintValidation.isValid) {
       const errorMessages = constraintValidation.violations
         .filter(v => v.severity === 'error')
         .map(v => v.message)
       validationErrors.push(...errorMessages)
     }
-    
+
     // 従来の制約チェックも併用（互換性のため）
     const crossClassValidation = validateCrossClassConstraints(geminiResult.data.schedules)
     if (crossClassValidation.errors.length > 0) {
@@ -153,35 +151,34 @@ export async function generateBulkTimetable(
         success: false,
         error: 'VALIDATION_FAILED',
         message: `検証エラー: ${validationErrors.join('; ')}`,
-        retryable: true
+        retryable: true,
       }
     }
 
     // データベースにスケジュールを保存
     const { totalSlotsCreated, slotsPerClass } = await saveBulkSchedulesToDatabase(
-      db, 
+      db,
       geminiResult.data,
       classIds
     )
-    
+
     return {
       success: true,
       data: {
         timetableId,
         classIds,
         totalSlotsCreated,
-        slotsPerClass
-      }
+        slotsPerClass,
+      },
     }
-
   } catch (error) {
     console.error('バルク時間割生成エラー:', error)
-    
+
     return {
       success: false,
       error: 'UNEXPECTED_ERROR',
       message: '予期しないエラーが発生しました',
-      retryable: true
+      retryable: true,
     }
   }
 }
@@ -189,24 +186,21 @@ export async function generateBulkTimetable(
 /**
  * スケジュールをクラス別にグループ化
  */
-function groupSchedulesByClass(
-  schedules: any[], 
-  classIds: string[]
-): Record<string, any[]> {
+function groupSchedulesByClass(schedules: any[], classIds: string[]): Record<string, any[]> {
   const grouped: Record<string, any[]> = {}
-  
+
   // 全クラスIDで初期化
   for (const classId of classIds) {
     grouped[classId] = []
   }
-  
+
   // スケジュールをクラス別に分類
   for (const schedule of schedules) {
     if (schedule.classId && classIds.includes(schedule.classId)) {
       grouped[schedule.classId].push(schedule)
     }
   }
-  
+
   return grouped
 }
 
@@ -220,12 +214,12 @@ function validateCrossClassConstraints(schedules: any[]): { errors: string[] } {
 
   for (const schedule of schedules) {
     const timeKey = `${schedule.dayOfWeek}-${schedule.period}`
-    
+
     // 教師の重複チェック
     if (!teacherSlots.has(schedule.teacherId)) {
       teacherSlots.set(schedule.teacherId, new Set())
     }
-    
+
     if (teacherSlots.get(schedule.teacherId)!.has(timeKey)) {
       errors.push(
         `教師重複: ${schedule.teacherId} が ${schedule.dayOfWeek}曜日 ${schedule.period}時限に複数クラスに配置されています`
@@ -237,7 +231,7 @@ function validateCrossClassConstraints(schedules: any[]): { errors: string[] } {
     if (!classroomSlots.has(schedule.classroomId)) {
       classroomSlots.set(schedule.classroomId, new Set())
     }
-    
+
     if (classroomSlots.get(schedule.classroomId)!.has(timeKey)) {
       errors.push(
         `教室重複: ${schedule.classroomId} が ${schedule.dayOfWeek}曜日 ${schedule.period}時限に複数クラスで使用されています`
@@ -260,14 +254,14 @@ async function saveBulkSchedulesToDatabase(
   const { timetableId, schedules: generatedSchedules } = timetableData
 
   if (!generatedSchedules || generatedSchedules.length === 0) {
-    return { 
-      totalSlotsCreated: 0, 
-      slotsPerClass: Object.fromEntries(classIds.map(id => [id, 0]))
+    return {
+      totalSlotsCreated: 0,
+      slotsPerClass: Object.fromEntries(classIds.map(id => [id, 0])),
     }
   }
 
   // 指定クラスのスケジュールのみフィルタ
-  const validSchedules = generatedSchedules.filter((schedule: any) => 
+  const validSchedules = generatedSchedules.filter((schedule: any) =>
     classIds.includes(schedule.classId)
   )
 
@@ -291,9 +285,9 @@ async function saveBulkSchedulesToDatabase(
   for (const classId of classIds) {
     slotsPerClass[classId] = scheduleInserts.filter((s: any) => s.classId === classId).length
   }
-  
+
   return {
     totalSlotsCreated: scheduleInserts.length,
-    slotsPerClass
+    slotsPerClass,
   }
 }

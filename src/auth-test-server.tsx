@@ -4,12 +4,12 @@
  */
 
 import { Hono } from 'hono'
-import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
-import authRouter from './routes/auth'
+import { cors } from 'hono/cors'
+import { startCacheCleanup } from './lib/cache-system'
 import { errorHandler } from './lib/error-handler'
 import { performanceMonitor } from './lib/performance-monitor'
-import { startCacheCleanup } from './lib/cache-system'
+import authRouter from './routes/auth'
 
 type Env = {
   DB: D1Database
@@ -23,12 +23,15 @@ type Env = {
 const app = new Hono<{ Bindings: Env }>()
 
 // グローバルミドルウェア
-app.use('*', cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}))
+app.use(
+  '*',
+  cors({
+    origin: ['http://localhost:3000', 'http://localhost:5173'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+)
 
 app.use('*', errorHandler())
 app.use('*', performanceMonitor())
@@ -40,7 +43,7 @@ app.use('*', async (c, next) => {
 })
 
 // ルートページ
-app.get('/', (c) => {
+app.get('/', c => {
   return c.html(
     <html>
       <head>
@@ -57,41 +60,43 @@ app.get('/', (c) => {
       <body>
         <h1>🔐 Auth0認証テストサーバー</h1>
         <p>認証機能のテストエンドポイント</p>
-        
+
         <h2>認証設定・状態確認</h2>
-        <div class="endpoint">
-          <span class="method get">GET</span> /api/auth/status - Auth0設定状態確認
+        <div class='endpoint'>
+          <span class='method get'>GET</span> /api/auth/status - Auth0設定状態確認
         </div>
-        <div class="endpoint">
-          <span class="method get">GET</span> /api/auth/health - 認証ヘルスチェック
+        <div class='endpoint'>
+          <span class='method get'>GET</span> /api/auth/health - 認証ヘルスチェック
         </div>
-        <div class="endpoint">
-          <span class="method get">GET</span> /api/auth/config - Auth0設定情報取得
+        <div class='endpoint'>
+          <span class='method get'>GET</span> /api/auth/config - Auth0設定情報取得
         </div>
-        
+
         <h2>認証テスト</h2>
-        <div class="endpoint">
-          <span class="method get">GET</span> /api/auth/user/me - ユーザー情報取得
+        <div class='endpoint'>
+          <span class='method get'>GET</span> /api/auth/user/me - ユーザー情報取得
         </div>
-        <div class="endpoint">
-          <span class="method get">GET</span> /api/auth/user/permissions - ユーザー権限一覧
+        <div class='endpoint'>
+          <span class='method get'>GET</span> /api/auth/user/permissions - ユーザー権限一覧
         </div>
-        <div class="endpoint">
-          <span class="method post">POST</span> /api/auth/verify - JWTトークン検証
+        <div class='endpoint'>
+          <span class='method post'>POST</span> /api/auth/verify - JWTトークン検証
         </div>
-        
+
         <h2>開発環境用モック</h2>
-        <div class="endpoint">
-          <span class="method post">POST</span> /api/auth/mock/token - モックトークン生成
+        <div class='endpoint'>
+          <span class='method post'>POST</span> /api/auth/mock/token - モックトークン生成
         </div>
-        <div class="endpoint">
-          <span class="method post">POST</span> /api/auth/mock/user - カスタムモックユーザー生成
+        <div class='endpoint'>
+          <span class='method post'>POST</span> /api/auth/mock/user - カスタムモックユーザー生成
         </div>
-        
+
         <h2>テスト実行</h2>
         <p>ターミナルで以下を実行:</p>
-        <pre><code>./test-auth-simple.sh</code></pre>
-        
+        <pre>
+          <code>./test-auth-simple.sh</code>
+        </pre>
+
         <h2>設定済みAuth0情報</h2>
         <p>wrangler.jsoncに設定された値が使用されます</p>
       </body>
@@ -103,15 +108,15 @@ app.get('/', (c) => {
 app.route('/api/auth', authRouter)
 
 // 簡単な接続テスト
-app.get('/api/test', (c) => {
+app.get('/api/test', c => {
   return c.json({
     success: true,
     message: 'Auth test server is running',
     timestamp: new Date().toISOString(),
     env: {
       authDomain: c.env.AUTH0_DOMAIN || 'not configured',
-      nodeEnv: c.env.NODE_ENV || 'development'
-    }
+      nodeEnv: c.env.NODE_ENV || 'development',
+    },
   })
 })
 

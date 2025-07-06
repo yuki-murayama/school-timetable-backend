@@ -67,52 +67,55 @@ export async function generateTimetableWithGemini(
 ): Promise<TimetableGenerationResult> {
   try {
     const generationConfig = getGenerationConfigForPriority(priority)
-    
+
     const request: GeminiRequest = {
       contents: [
         {
           parts: [
             {
-              text: prompt
-            }
-          ]
-        }
+              text: prompt,
+            },
+          ],
+        },
       ],
-      generationConfig
+      generationConfig,
     }
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(request)
-    })
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      }
+    )
 
     if (!response.ok) {
-      const errorData = await response.json() as GeminiError
+      const errorData = (await response.json()) as GeminiError
       console.error('Gemini API Error:', errorData)
-      
+
       // リトライ可能なエラーかどうかを判断
       const retryable = response.status >= 500 || response.status === 429
-      
+
       return {
         success: false,
         error: errorData.error?.status || 'GEMINI_API_ERROR',
         message: errorData.error?.message || 'Gemini APIでエラーが発生しました',
-        retryable
+        retryable,
       }
     }
 
-    const geminiResponse = await response.json() as GeminiResponse
-    
+    const geminiResponse = (await response.json()) as GeminiResponse
+
     // レスポンスからテキストを抽出
     if (!geminiResponse.candidates || geminiResponse.candidates.length === 0) {
       return {
         success: false,
         error: 'NO_CANDIDATES_GENERATED',
         message: 'Gemini APIから候補が生成されませんでした',
-        retryable: true
+        retryable: true,
       }
     }
 
@@ -122,20 +125,18 @@ export async function generateTimetableWithGemini(
         success: false,
         error: 'NO_CONTENT_GENERATED',
         message: 'Gemini APIから有効な内容が生成されませんでした',
-        retryable: true
+        retryable: true,
       }
     }
 
-    const generatedText = candidate.content.parts
-      .map(part => part.text)
-      .join('')
+    const generatedText = candidate.content.parts.map(part => part.text).join('')
 
     if (!generatedText) {
       return {
         success: false,
         error: 'EMPTY_CONTENT_GENERATED',
         message: 'Gemini APIから空の内容が生成されました',
-        retryable: true
+        retryable: true,
       }
     }
 
@@ -143,9 +144,10 @@ export async function generateTimetableWithGemini(
     let parsedData
     try {
       // コードブロックが含まれている場合は抽出
-      const jsonMatch = generatedText.match(/```json\s*([\s\S]*?)\s*```/) || 
-                       generatedText.match(/```\s*([\s\S]*?)\s*```/)
-      
+      const jsonMatch =
+        generatedText.match(/```json\s*([\s\S]*?)\s*```/) ||
+        generatedText.match(/```\s*([\s\S]*?)\s*```/)
+
       const jsonText = jsonMatch ? jsonMatch[1] : generatedText
       parsedData = JSON.parse(jsonText)
     } catch (parseError) {
@@ -155,13 +157,13 @@ export async function generateTimetableWithGemini(
         success: false,
         error: 'INVALID_JSON_RESPONSE',
         message: 'Gemini APIからの応答が有効なJSON形式ではありません',
-        retryable: true
+        retryable: true,
       }
     }
 
     return {
       success: true,
-      data: parsedData
+      data: parsedData,
     }
   } catch (error) {
     console.error('Gemini API呼び出しエラー:', error)
@@ -169,7 +171,7 @@ export async function generateTimetableWithGemini(
       success: false,
       error: 'GEMINI_API_CALL_ERROR',
       message: 'Gemini APIの呼び出しに失敗しました',
-      retryable: true
+      retryable: true,
     }
   }
 }
@@ -184,14 +186,14 @@ function getGenerationConfigForPriority(priority: 'speed' | 'quality' | 'balance
         temperature: 0.3,
         maxOutputTokens: 4000,
         topP: 0.8,
-        topK: 20
+        topK: 20,
       }
     case 'quality':
       return {
         temperature: 0.7,
         maxOutputTokens: 8000,
         topP: 0.95,
-        topK: 40
+        topK: 40,
       }
     case 'balanced':
     default:
@@ -199,7 +201,7 @@ function getGenerationConfigForPriority(priority: 'speed' | 'quality' | 'balance
         temperature: 0.5,
         maxOutputTokens: 6000,
         topP: 0.9,
-        topK: 30
+        topK: 30,
       }
   }
 }

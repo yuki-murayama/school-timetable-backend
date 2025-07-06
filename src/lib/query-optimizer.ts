@@ -3,14 +3,22 @@
  * バッチ処理、効率的なJOIN、インデックス活用
  */
 
-import type { DrizzleDb } from './db'
-import { eq, inArray, and, or, desc, asc, count, sql } from 'drizzle-orm'
-import { 
-  schools, classes, teachers, subjects, classrooms,
-  timetables, schedules, teacherSubjects, classroomSubjects,
-  constraintConfigurations, generationLogs
+import { and, asc, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import {
+  classes,
+  classroomSubjects,
+  classrooms,
+  constraintConfigurations,
+  generationLogs,
+  schedules,
+  schools,
+  subjects,
+  teacherSubjects,
+  teachers,
+  timetables,
 } from '../db/schema'
 import { cachedQuery } from './cache-system'
+import type { DrizzleDb } from './db'
 
 /**
  * 最適化されたスケジュール取得（JOINを使用）
@@ -23,15 +31,17 @@ export async function getOptimizedSchedules(
     useCache?: boolean
     cacheTTL?: number
   } = {}
-): Promise<Array<{
-  schedule: any
-  class: any
-  teacher: any
-  subject: any
-  classroom: any
-}>> {
+): Promise<
+  Array<{
+    schedule: any
+    class: any
+    teacher: any
+    subject: any
+    classroom: any
+  }>
+> {
   const { classIds, useCache = true, cacheTTL = 300000 } = options
-  
+
   const queryFn = async () => {
     let query = db
       .select({
@@ -40,26 +50,26 @@ export async function getOptimizedSchedules(
           id: classes.id,
           name: classes.name,
           grade: classes.grade,
-          section: classes.section
+          section: classes.section,
         },
         teacher: {
           id: teachers.id,
           name: teachers.name,
-          employmentType: teachers.employmentType
+          employmentType: teachers.employmentType,
         },
         subject: {
           id: subjects.id,
           name: subjects.name,
           shortName: subjects.shortName,
-          color: subjects.color
+          color: subjects.color,
         },
         classroom: {
           id: classrooms.id,
           name: classrooms.name,
           type: classrooms.type,
           building: classrooms.building,
-          floor: classrooms.floor
-        }
+          floor: classrooms.floor,
+        },
       })
       .from(schedules)
       .innerJoin(classes, eq(schedules.classId, classes.id))
@@ -69,10 +79,9 @@ export async function getOptimizedSchedules(
       .where(eq(schedules.timetableId, timetableId))
 
     if (classIds && classIds.length > 0) {
-      query = query.where(and(
-        eq(schedules.timetableId, timetableId),
-        inArray(schedules.classId, classIds)
-      ))
+      query = query.where(
+        and(eq(schedules.timetableId, timetableId), inArray(schedules.classId, classIds))
+      )
     }
 
     return await query.orderBy(
@@ -98,13 +107,18 @@ export async function getBatchClassStatistics(
   db: DrizzleDb,
   timetableId: string,
   classIds: string[]
-): Promise<Record<string, {
-  totalSlots: number
-  filledSlots: number
-  fillRate: number
-  subjectDistribution: Record<string, number>
-  teacherHours: Record<string, number>
-}>> {
+): Promise<
+  Record<
+    string,
+    {
+      totalSlots: number
+      filledSlots: number
+      fillRate: number
+      subjectDistribution: Record<string, number>
+      teacherHours: Record<string, number>
+    }
+  >
+> {
   // 単一クエリで全クラスの統計を取得
   const scheduleStats = await db
     .select({
@@ -113,15 +127,12 @@ export async function getBatchClassStatistics(
       subjectName: subjects.name,
       teacherId: schedules.teacherId,
       teacherName: teachers.name,
-      scheduleCount: count()
+      scheduleCount: count(),
     })
     .from(schedules)
     .innerJoin(subjects, eq(schedules.subjectId, subjects.id))
     .innerJoin(teachers, eq(schedules.teacherId, teachers.id))
-    .where(and(
-      eq(schedules.timetableId, timetableId),
-      inArray(schedules.classId, classIds)
-    ))
+    .where(and(eq(schedules.timetableId, timetableId), inArray(schedules.classId, classIds)))
     .groupBy(
       schedules.classId,
       schedules.subjectId,
@@ -141,15 +152,16 @@ export async function getBatchClassStatistics(
 
   // クラス別に統計を集計
   const results: Record<string, any> = {}
-  
+
   for (const classId of classIds) {
     const classSchedules = scheduleStats.filter(s => s.classId === classId)
     const filledSlots = classSchedules.reduce((sum, s) => sum + s.scheduleCount, 0)
-    
+
     // 教科分布
     const subjectDistribution: Record<string, number> = {}
     classSchedules.forEach(s => {
-      subjectDistribution[s.subjectName] = (subjectDistribution[s.subjectName] || 0) + s.scheduleCount
+      subjectDistribution[s.subjectName] =
+        (subjectDistribution[s.subjectName] || 0) + s.scheduleCount
     })
 
     // 教師担当時間数
@@ -163,7 +175,7 @@ export async function getBatchClassStatistics(
       filledSlots,
       fillRate: filledSlots / maxSlotsPerClass,
       subjectDistribution,
-      teacherHours
+      teacherHours,
     }
   }
 
@@ -177,11 +189,16 @@ export async function getSchoolConstraints(
   db: DrizzleDb,
   schoolId: string,
   useCache: boolean = true
-): Promise<Record<string, {
-  isEnabled: boolean
-  priority: number
-  parameters: Record<string, any>
-}>> {
+): Promise<
+  Record<
+    string,
+    {
+      isEnabled: boolean
+      priority: number
+      parameters: Record<string, any>
+    }
+  >
+> {
   const queryFn = async () => {
     const constraints = await db
       .select()
@@ -194,7 +211,7 @@ export async function getSchoolConstraints(
       result[constraint.constraintType] = {
         isEnabled: constraint.isEnabled,
         priority: constraint.priority,
-        parameters: constraint.parameters || {}
+        parameters: constraint.parameters || {},
       }
     })
 
@@ -216,12 +233,17 @@ export async function getTeacherSubjectMapping(
   db: DrizzleDb,
   schoolId: string,
   useCache: boolean = true
-): Promise<Record<string, Array<{
-  subjectId: string
-  subjectName: string
-  qualificationLevel: string
-  priority: number
-}>>> {
+): Promise<
+  Record<
+    string,
+    Array<{
+      subjectId: string
+      subjectName: string
+      qualificationLevel: string
+      priority: number
+    }>
+  >
+> {
   const queryFn = async () => {
     const mapping = await db
       .select({
@@ -230,16 +252,18 @@ export async function getTeacherSubjectMapping(
         subjectId: subjects.id,
         subjectName: subjects.name,
         qualificationLevel: teacherSubjects.qualificationLevel,
-        priority: teacherSubjects.priority
+        priority: teacherSubjects.priority,
       })
       .from(teachers)
       .innerJoin(teacherSubjects, eq(teachers.id, teacherSubjects.teacherId))
       .innerJoin(subjects, eq(teacherSubjects.subjectId, subjects.id))
-      .where(and(
-        eq(teachers.schoolId, schoolId),
-        eq(teachers.isActive, true),
-        eq(subjects.isActive, true)
-      ))
+      .where(
+        and(
+          eq(teachers.schoolId, schoolId),
+          eq(teachers.isActive, true),
+          eq(subjects.isActive, true)
+        )
+      )
       .orderBy(asc(teacherSubjects.priority))
 
     const result: Record<string, any> = {}
@@ -251,7 +275,7 @@ export async function getTeacherSubjectMapping(
         subjectId: item.subjectId,
         subjectName: item.subjectName,
         qualificationLevel: item.qualificationLevel || 'qualified',
-        priority: item.priority || 1
+        priority: item.priority || 1,
       })
     })
 
@@ -273,12 +297,17 @@ export async function getClassroomSubjectMapping(
   db: DrizzleDb,
   schoolId: string,
   useCache: boolean = true
-): Promise<Record<string, Array<{
-  classroomId: string
-  classroomName: string
-  classroomType: string
-  preferredSubjects: string[]
-}>>> {
+): Promise<
+  Record<
+    string,
+    Array<{
+      classroomId: string
+      classroomName: string
+      classroomType: string
+      preferredSubjects: string[]
+    }>
+  >
+> {
   const queryFn = async () => {
     const mapping = await db
       .select({
@@ -288,29 +317,26 @@ export async function getClassroomSubjectMapping(
         classroomName: classrooms.name,
         classroomType: classrooms.type,
         building: classrooms.building,
-        floor: classrooms.floor
+        floor: classrooms.floor,
       })
       .from(subjects)
       .leftJoin(classroomSubjects, eq(subjects.id, classroomSubjects.subjectId))
       .leftJoin(classrooms, eq(classroomSubjects.classroomId, classrooms.id))
-      .where(and(
-        eq(subjects.schoolId, schoolId),
-        eq(subjects.isActive, true)
-      ))
+      .where(and(eq(subjects.schoolId, schoolId), eq(subjects.isActive, true)))
 
     const result: Record<string, any> = {}
-    
+
     mapping.forEach(item => {
       if (!result[item.subjectId]) {
         result[item.subjectId] = []
       }
-      
+
       if (item.classroomId) {
         result[item.subjectId].push({
           classroomId: item.classroomId,
           classroomName: item.classroomName,
           classroomType: item.classroomType,
-          preferredSubjects: [] // 逆引き用（後で設定）
+          preferredSubjects: [], // 逆引き用（後で設定）
         })
       }
     })
@@ -356,33 +382,30 @@ export async function detectConflictsOptimized(
   }>
 }> {
   // 効率的な競合検出のため、単一クエリで全ての関連データを取得
-  const timeSlots = Array.from(new Set(
-    targetSchedules.map(s => `${s.dayOfWeek}-${s.period}`)
-  ))
+  const timeSlots = Array.from(new Set(targetSchedules.map(s => `${s.dayOfWeek}-${s.period}`)))
 
   const existingSchedules = await db
     .select({
       schedule: schedules,
       teacher: { id: teachers.id, name: teachers.name },
       classroom: { id: classrooms.id, name: classrooms.name },
-      class: { id: classes.id, name: classes.name }
+      class: { id: classes.id, name: classes.name },
     })
     .from(schedules)
     .innerJoin(teachers, eq(schedules.teacherId, teachers.id))
     .innerJoin(classrooms, eq(schedules.classroomId, classrooms.id))
     .innerJoin(classes, eq(schedules.classId, classes.id))
-    .where(and(
-      eq(schedules.timetableId, timetableId),
-      or(
-        ...timeSlots.map(slot => {
-          const [dayOfWeek, period] = slot.split('-').map(Number)
-          return and(
-            eq(schedules.dayOfWeek, dayOfWeek),
-            eq(schedules.period, period)
-          )
-        })
+    .where(
+      and(
+        eq(schedules.timetableId, timetableId),
+        or(
+          ...timeSlots.map(slot => {
+            const [dayOfWeek, period] = slot.split('-').map(Number)
+            return and(eq(schedules.dayOfWeek, dayOfWeek), eq(schedules.period, period))
+          })
+        )
       )
-    ))
+    )
 
   // 競合分析
   const teacherConflicts: any[] = []
@@ -402,7 +425,7 @@ export async function detectConflictsOptimized(
   targetSchedules.forEach(newSchedule => {
     const key = `${newSchedule.teacherId}-${newSchedule.dayOfWeek}-${newSchedule.period}`
     const existing = teacherSlots.get(key)
-    
+
     if (existing && existing.length > 0) {
       const teacherName = existing[0].teacher.name
       teacherConflicts.push({
@@ -412,8 +435,8 @@ export async function detectConflictsOptimized(
         period: newSchedule.period,
         conflictingClasses: existing.map(e => ({
           classId: e.class.id,
-          className: e.class.name
-        }))
+          className: e.class.name,
+        })),
       })
     }
   })
@@ -431,7 +454,7 @@ export async function detectConflictsOptimized(
   targetSchedules.forEach(newSchedule => {
     const key = `${newSchedule.classroomId}-${newSchedule.dayOfWeek}-${newSchedule.period}`
     const existing = classroomSlots.get(key)
-    
+
     if (existing && existing.length > 0) {
       const classroomName = existing[0].classroom.name
       classroomConflicts.push({
@@ -441,8 +464,8 @@ export async function detectConflictsOptimized(
         period: newSchedule.period,
         conflictingClasses: existing.map(e => ({
           classId: e.class.id,
-          className: e.class.name
-        }))
+          className: e.class.name,
+        })),
       })
     }
   })
@@ -474,7 +497,7 @@ export async function bulkInsertSchedules(
   // バッチ処理で挿入
   for (let i = 0; i < scheduleData.length; i += batchSize) {
     const batch = scheduleData.slice(i, i + batchSize)
-    
+
     try {
       await db.insert(schedules).values(batch)
       inserted += batch.length
@@ -494,13 +517,13 @@ export async function measureQueryPerformance<T>(
   queryFn: () => Promise<T>
 ): Promise<{ result: T; duration: number }> {
   const startTime = Date.now()
-  
+
   try {
     const result = await queryFn()
     const duration = Date.now() - startTime
-    
+
     console.log(`Query performance: ${queryName} took ${duration}ms`)
-    
+
     return { result, duration }
   } catch (error) {
     const duration = Date.now() - startTime

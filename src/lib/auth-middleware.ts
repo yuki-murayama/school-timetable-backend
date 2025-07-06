@@ -3,21 +3,21 @@
  * Auth0トークンの検証とリクエストコンテキスト設定
  */
 
-import { Context, Next } from 'hono'
+import type { Context, Next } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
-import { 
-  verifyAuth0Token, 
-  extractTokenFromHeader, 
-  createAuthContext,
-  hasPermission,
-  canAccessSchool,
-  createMockUser,
+import {
   type Auth0User,
   type AuthContext,
-  type UserRole
+  canAccessSchool,
+  createAuthContext,
+  createMockUser,
+  extractTokenFromHeader,
+  hasPermission,
+  type UserRole,
+  verifyAuth0Token,
 } from './auth0'
-import { sendErrorResponse, ERROR_CODES } from './error-handler'
+import { ERROR_CODES, sendErrorResponse } from './error-handler'
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -29,15 +29,12 @@ declare module 'hono' {
 /**
  * JWT認証ミドルウェア
  */
-export function jwtAuth(options: {
-  required?: boolean
-  allowMock?: boolean
-} = {}) {
+export function jwtAuth(options: { required?: boolean; allowMock?: boolean } = {}) {
   const { required = true, allowMock = false } = options
 
   return createMiddleware(async (c: Context, next: Next) => {
     const requestId = c.get('requestId')
-    
+
     try {
       const authHeader = c.req.header('Authorization')
       const token = extractTokenFromHeader(authHeader)
@@ -46,18 +43,18 @@ export function jwtAuth(options: {
       if (allowMock && (!token || token === 'mock')) {
         const mockUser = createMockUser()
         const authContext = createAuthContext(mockUser)
-        
+
         c.set('authUser', mockUser)
         c.set('authContext', authContext)
-        
+
         return await next()
       }
 
       // トークンが必要だが提供されていない場合
       if (required && !token) {
         return sendErrorResponse(
-          c, 
-          ERROR_CODES.AUTHENTICATION_REQUIRED, 
+          c,
+          ERROR_CODES.AUTHENTICATION_REQUIRED,
           'Authorization header with Bearer token is required',
           undefined,
           requestId
@@ -78,10 +75,9 @@ export function jwtAuth(options: {
       c.set('authContext', authContext)
 
       return await next()
-
     } catch (error: any) {
       console.error('Authentication error:', error)
-      
+
       return sendErrorResponse(
         c,
         ERROR_CODES.AUTHENTICATION_FAILED,
@@ -116,9 +112,9 @@ export function requirePermission(permission: string) {
         c,
         ERROR_CODES.INSUFFICIENT_PERMISSIONS,
         `Permission '${permission}' is required to access this resource`,
-        { 
+        {
           userRole: user[`https://school-timetable.app/user_metadata`]?.role || 'unknown',
-          requiredPermission: permission 
+          requiredPermission: permission,
         },
         requestId
       )
@@ -153,9 +149,9 @@ export function requireRole(roles: UserRole | UserRole[]) {
         c,
         ERROR_CODES.INSUFFICIENT_PERMISSIONS,
         `One of the following roles is required: ${allowedRoles.join(', ')}`,
-        { 
+        {
           userRole: authContext.role,
-          requiredRoles: allowedRoles 
+          requiredRoles: allowedRoles,
         },
         requestId
       )
@@ -216,12 +212,12 @@ export function requireSchoolAccess(getSchoolId?: (c: Context) => string) {
 export function devAuth() {
   return createMiddleware(async (c: Context, next: Next) => {
     const isDev = process.env.NODE_ENV === 'development'
-    
+
     if (isDev) {
       // 開発環境ではモックユーザーを使用
       const mockUser = createMockUser()
       const authContext = createAuthContext(mockUser)
-      
+
       c.set('authUser', mockUser)
       c.set('authContext', authContext)
     }
@@ -272,7 +268,7 @@ export async function validateAuthSetup(): Promise<{
   issues: string[]
 }> {
   const issues: string[] = []
-  
+
   const domain = process.env.AUTH0_DOMAIN
   const audience = process.env.AUTH0_AUDIENCE
 
@@ -296,6 +292,6 @@ export async function validateAuthSetup(): Promise<{
     isConfigured: issues.length === 0,
     domain: domain || 'not configured',
     audience: audience || 'not configured',
-    issues
+    issues,
   }
 }

@@ -228,12 +228,7 @@ classesRouter.put('/:id', zValidator('json', UpdateClassSchema), async c => {
       const duplicateClass = await db
         .select()
         .from(classes)
-        .where(
-          and(
-            eq(classes.schoolId, existingClass.schoolId),
-            eq(classes.name, data.name)
-          )
-        )
+        .where(and(eq(classes.schoolId, existingClass.schoolId), eq(classes.name, data.name)))
         .get()
 
       if (duplicateClass) {

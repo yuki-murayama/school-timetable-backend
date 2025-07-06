@@ -40,7 +40,7 @@ export class Auth0Config {
   public static readonly AUDIENCE = process.env.AUTH0_AUDIENCE || 'https://api.school-timetable.app'
   public static readonly ISSUER = `https://${Auth0Config.DOMAIN}/`
   public static readonly JWKS_URI = `${Auth0Config.ISSUER}.well-known/jwks.json`
-  
+
   // カスタムクレームの名前空間
   public static readonly NAMESPACE = 'https://school-timetable.app/'
 }
@@ -158,7 +158,7 @@ export function checkRolePermission(role: UserRole, permission: string): boolean
       'constraints:read',
       'constraints:write',
       'users:read',
-      'users:write'
+      'users:write',
     ],
     teacher: [
       'schools:read',
@@ -167,7 +167,7 @@ export function checkRolePermission(role: UserRole, permission: string): boolean
       'subjects:read',
       'classrooms:read',
       'timetables:read',
-      'constraints:read'
+      'constraints:read',
     ],
     viewer: [
       'schools:read',
@@ -175,12 +175,12 @@ export function checkRolePermission(role: UserRole, permission: string): boolean
       'teachers:read',
       'subjects:read',
       'classrooms:read',
-      'timetables:read'
-    ]
+      'timetables:read',
+    ],
   }
 
   const userPermissions = rolePermissions[role] || []
-  
+
   // スーパー管理者は全権限
   if (userPermissions.includes('*')) {
     return true
@@ -194,7 +194,7 @@ export function checkRolePermission(role: UserRole, permission: string): boolean
  */
 export function canAccessSchool(user: Auth0User, schoolId: string): boolean {
   const role = getUserRole(user)
-  
+
   // スーパー管理者は全学校にアクセス可能
   if (role === 'super_admin') {
     return true
@@ -213,7 +213,7 @@ export function createAuthContext(user: Auth0User): AuthContext {
     user,
     schoolId: getUserSchoolId(user),
     role: getUserRole(user),
-    permissions: user.permissions || []
+    permissions: user.permissions || [],
   }
 }
 
@@ -232,8 +232,8 @@ export function createMockUser(overrides: Partial<Auth0User> = {}): Auth0User {
     [`${Auth0Config.NAMESPACE}user_metadata`]: {
       schoolId: 'school-1',
       role: 'school_admin',
-      permissions: ['schools:read', 'schools:write']
+      permissions: ['schools:read', 'schools:write'],
     },
-    ...overrides
+    ...overrides,
   }
 }

@@ -535,12 +535,10 @@ app.get('/api/frontend/school/subjects', async c => {
   try {
     const db = c.env.DB
     
-    // subjectsテーブルのスキーマを強制的に修正
-    // 既存のテーブルを削除して正しいスキーマで再作成
-    await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
+    // subjectsテーブルが存在しない場合は作成
     await db
       .prepare(`
-      CREATE TABLE subjects (
+      CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,
         school_id TEXT NOT NULL DEFAULT 'school-1',
         name TEXT NOT NULL,
@@ -611,12 +609,10 @@ app.post('/api/frontend/school/subjects', async c => {
       )
     }
     
-    // subjectsテーブルのスキーマを強制的に修正
-    // 既存のテーブルを削除して正しいスキーマで再作成
-    await db.prepare(`DROP TABLE IF EXISTS subjects`).run()
+    // subjectsテーブルが存在しない場合は作成
     await db
       .prepare(`
-      CREATE TABLE subjects (
+      CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,
         school_id TEXT NOT NULL DEFAULT 'school-1',
         name TEXT NOT NULL,
@@ -910,6 +906,445 @@ app.put('/api/frontend/school/subjects', async c => {
     return c.json({
       success: true,
       data: savedSubjects,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 教室情報API
+// 1. 教室一覧取得
+app.get('/api/frontend/school/classrooms', async c => {
+  try {
+    const db = c.env.DB
+    
+    // classroomsテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS classrooms (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+    
+    // 教室一覧を取得
+    const result = await db
+      .prepare(`
+      SELECT * FROM classrooms WHERE school_id = ? ORDER BY created_at DESC
+    `)
+      .bind('school-1')
+      .all()
+    
+    const classrooms = result.results.map((row: Record<string, unknown>) => ({
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      count: row.count,
+    }))
+    
+    return c.json({
+      success: true,
+      data: classrooms,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 2. 教室新規作成
+app.post('/api/frontend/school/classrooms', async c => {
+  try {
+    const body = await c.req.json()
+    const db = c.env.DB
+    
+    // 必須フィールドのバリデーション
+    if (!body.name || body.name.trim().length === 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室名は必須です'],
+        },
+        400
+      )
+    }
+    
+    if (!body.type || body.type.trim().length === 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室タイプは必須です'],
+        },
+        400
+      )
+    }
+    
+    if (!body.count || body.count < 1) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室数は1以上である必要があります'],
+        },
+        400
+      )
+    }
+    
+    if (body.name.length > 100) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室名は100文字以内で入力してください'],
+        },
+        400
+      )
+    }
+    
+    // classroomsテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS classrooms (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+    
+    // 重複チェック
+    const existing = await db
+      .prepare(`
+      SELECT id FROM classrooms WHERE school_id = ? AND name = ?
+    `)
+      .bind('school-1', body.name.trim())
+      .first()
+    
+    if (existing) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['同じ教室名は既に登録されています'],
+        },
+        400
+      )
+    }
+    
+    const classroomId = `classroom-${Date.now()}`
+    const now = new Date().toISOString()
+    
+    await db
+      .prepare(`
+      INSERT INTO classrooms (id, school_id, name, type, count, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
+      .bind(
+        classroomId,
+        'school-1',
+        body.name.trim(),
+        body.type.trim(),
+        parseInt(body.count) || 1,
+        now,
+        now
+      )
+      .run()
+    
+    return c.json({
+      success: true,
+      data: {
+        id: classroomId,
+        name: body.name.trim(),
+        type: body.type.trim(),
+        count: parseInt(body.count) || 1,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 3. 教室更新
+app.put('/api/frontend/school/classrooms/:id', async c => {
+  try {
+    const classroomId = c.req.param('id')
+    const body = await c.req.json()
+    const db = c.env.DB
+    
+    // 必須フィールドのバリデーション
+    if (!body.name || body.name.trim().length === 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室名は必須です'],
+        },
+        400
+      )
+    }
+    
+    if (!body.type || body.type.trim().length === 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室タイプは必須です'],
+        },
+        400
+      )
+    }
+    
+    if (!body.count || body.count < 1) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室数は1以上である必要があります'],
+        },
+        400
+      )
+    }
+    
+    if (body.name.length > 100) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['教室名は100文字以内で入力してください'],
+        },
+        400
+      )
+    }
+    
+    // 重複チェック（自分以外）
+    const existing = await db
+      .prepare(`
+      SELECT id FROM classrooms WHERE school_id = ? AND name = ? AND id != ?
+    `)
+      .bind('school-1', body.name.trim(), classroomId)
+      .first()
+    
+    if (existing) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors: ['同じ教室名は既に登録されています'],
+        },
+        400
+      )
+    }
+    
+    const now = new Date().toISOString()
+    
+    await db
+      .prepare(`
+      UPDATE classrooms 
+      SET name = ?, type = ?, count = ?, updated_at = ?
+      WHERE id = ? AND school_id = ?
+    `)
+      .bind(
+        body.name.trim(),
+        body.type.trim(),
+        parseInt(body.count) || 1,
+        now,
+        classroomId,
+        'school-1'
+      )
+      .run()
+    
+    return c.json({
+      success: true,
+      data: {
+        id: classroomId,
+        name: body.name.trim(),
+        type: body.type.trim(),
+        count: parseInt(body.count) || 1,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 4. 教室削除
+app.delete('/api/frontend/school/classrooms/:id', async c => {
+  try {
+    const classroomId = c.req.param('id')
+    const db = c.env.DB
+    
+    await db
+      .prepare(`
+      DELETE FROM classrooms WHERE id = ? AND school_id = ?
+    `)
+      .bind(classroomId, 'school-1')
+      .run()
+    
+    return c.json({
+      success: true,
+      data: null,
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 5. 教室一括保存
+app.put('/api/frontend/school/classrooms', async c => {
+  try {
+    const classrooms = await c.req.json()
+    const db = c.env.DB
+    const now = new Date().toISOString()
+    
+    const savedClassrooms = []
+    const errors: string[] = []
+    
+    // バリデーション
+    for (let i = 0; i < classrooms.length; i++) {
+      const classroom = classrooms[i]
+      if (!classroom.name || classroom.name.trim().length === 0) {
+        errors.push(`${i + 1}行目: 教室名は必須です`)
+      }
+      if (!classroom.type || classroom.type.trim().length === 0) {
+        errors.push(`${i + 1}行目: 教室タイプは必須です`)
+      }
+      if (!classroom.count || classroom.count < 1) {
+        errors.push(`${i + 1}行目: 教室数は1以上である必要があります`)
+      }
+      if (classroom.name && classroom.name.length > 100) {
+        errors.push(`${i + 1}行目: 教室名は100文字以内で入力してください`)
+      }
+    }
+    
+    if (errors.length > 0) {
+      return c.json(
+        {
+          success: false,
+          message: '入力データが不正です',
+          errors,
+        },
+        400
+      )
+    }
+    
+    for (const classroom of classrooms) {
+      if (classroom.id) {
+        // 既存教室の更新
+        // 重複チェック（自分以外）
+        const existing = await db
+          .prepare(`
+          SELECT id FROM classrooms WHERE school_id = ? AND name = ? AND id != ?
+        `)
+          .bind('school-1', classroom.name.trim(), classroom.id)
+          .first()
+        
+        if (!existing) {
+          await db
+            .prepare(`
+            UPDATE classrooms 
+            SET name = ?, type = ?, count = ?, updated_at = ?
+            WHERE id = ? AND school_id = ?
+          `)
+            .bind(
+              classroom.name.trim(),
+              classroom.type.trim(),
+              parseInt(classroom.count) || 1,
+              now,
+              classroom.id,
+              'school-1'
+            )
+            .run()
+          
+          savedClassrooms.push({
+            id: classroom.id,
+            name: classroom.name.trim(),
+            type: classroom.type.trim(),
+            count: parseInt(classroom.count) || 1,
+          })
+        }
+      } else {
+        // 新規教室の作成
+        // 重複チェック
+        const existing = await db
+          .prepare(`
+          SELECT id FROM classrooms WHERE school_id = ? AND name = ?
+        `)
+          .bind('school-1', classroom.name.trim())
+          .first()
+        
+        if (!existing) {
+          const classroomId = `classroom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+          
+          await db
+            .prepare(`
+            INSERT INTO classrooms (id, school_id, name, type, count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `)
+            .bind(
+              classroomId,
+              'school-1',
+              classroom.name.trim(),
+              classroom.type.trim(),
+              parseInt(classroom.count) || 1,
+              now,
+              now
+            )
+            .run()
+          
+          savedClassrooms.push({
+            id: classroomId,
+            name: classroom.name.trim(),
+            type: classroom.type.trim(),
+            count: parseInt(classroom.count) || 1,
+          })
+        }
+      }
+    }
+    
+    return c.json({
+      success: true,
+      data: savedClassrooms,
     })
   } catch (error) {
     return c.json(

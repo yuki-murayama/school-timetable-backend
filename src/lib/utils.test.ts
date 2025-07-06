@@ -3,23 +3,23 @@
  * D1に依存しない純粋な関数のテスト
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   createErrorResponse,
   createSuccessResponse,
-  sanitizeSchoolName,
-  normalizeGrade,
-  normalizeClassName,
-  normalizeTeacherName,
-  isValidId,
   createTimestamp,
+  isValidId,
+  normalizeClassName,
+  normalizeGrade,
+  normalizeTeacherName,
+  sanitizeSchoolName,
 } from './utils'
 
 describe('Utility Functions', () => {
   describe('createErrorResponse', () => {
     it('エラーレスポンスを正しく生成', () => {
       const result = createErrorResponse('TEST_ERROR', 'テストエラーです')
-      
+
       expect(result).toEqual({
         error: 'TEST_ERROR',
         message: 'テストエラーです',
@@ -29,7 +29,7 @@ describe('Utility Functions', () => {
 
     it('カスタムステータスコードでエラーレスポンス生成', () => {
       const result = createErrorResponse('NOT_FOUND', 'データが見つかりません', 404)
-      
+
       expect(result.status).toBe(404)
     })
   })
@@ -38,7 +38,7 @@ describe('Utility Functions', () => {
     it('成功レスポンスを正しく生成', () => {
       const data = { id: '123', name: 'テスト' }
       const result = createSuccessResponse(data)
-      
+
       expect(result).toEqual({
         success: true,
         data,
@@ -49,7 +49,7 @@ describe('Utility Functions', () => {
     it('カスタムステータスコードで成功レスポンス生成', () => {
       const data = { id: '123' }
       const result = createSuccessResponse(data, 201)
-      
+
       expect(result.status).toBe(201)
     })
   })
@@ -135,10 +135,10 @@ describe('Utility Functions', () => {
   describe('createTimestamp', () => {
     it('ISO形式のタイムスタンプを生成', () => {
       const timestamp = createTimestamp()
-      
+
       // ISO形式の日付文字列かチェック
       expect(timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
-      
+
       // 有効な日付かチェック
       const date = new Date(timestamp)
       expect(date.toISOString()).toBe(timestamp)
@@ -148,7 +148,7 @@ describe('Utility Functions', () => {
       const timestamp = createTimestamp()
       const now = new Date()
       const timestampDate = new Date(timestamp)
-      
+
       // 1秒以内の差であることを確認
       const diff = Math.abs(now.getTime() - timestampDate.getTime())
       expect(diff).toBeLessThan(1000)

@@ -3,9 +3,17 @@
  * 複数クラス、複雑制約を考慮した大規模時間割生成
  */
 
-import { eq, and, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { DrizzleDb } from '../db'
-import { timetables, schools, classes, subjects, teachers, classrooms, teacherSubjects } from '../db/schema'
+import {
+  classes,
+  classrooms,
+  schools,
+  subjects,
+  teacherSubjects,
+  teachers,
+  timetables,
+} from '../db/schema'
 import type { BulkGenerateTimetableInput } from './validation'
 
 interface BulkTimetableData {
@@ -82,10 +90,7 @@ export async function getBulkTimetableGenerationData(
         grade: classes.grade,
       })
       .from(classes)
-      .where(and(
-        eq(classes.schoolId, schoolId),
-        inArray(classes.id, classIds)
-      ))
+      .where(and(eq(classes.schoolId, schoolId), inArray(classes.id, classIds)))
 
     // 教師と担当教科情報を取得
     const teachersData = await db
@@ -101,8 +106,11 @@ export async function getBulkTimetableGenerationData(
       .where(eq(teachers.schoolId, schoolId))
 
     // 教師ごとに担当教科をグループ化
-    const teachersMap = new Map<string, { id: string; name: string; subjects: Array<{ id: string; name: string }> }>()
-    
+    const teachersMap = new Map<
+      string,
+      { id: string; name: string; subjects: Array<{ id: string; name: string }> }
+    >()
+
     for (const teacher of teachersData) {
       if (!teachersMap.has(teacher.id)) {
         teachersMap.set(teacher.id, {
@@ -111,7 +119,7 @@ export async function getBulkTimetableGenerationData(
           subjects: [],
         })
       }
-      
+
       if (teacher.subjectId && teacher.subjectName) {
         const teacherData = teachersMap.get(teacher.id)!
         teacherData.subjects.push({
@@ -163,13 +171,13 @@ export function generateBulkTimetablePrompt(
 ): string {
   const { timetable, classes, teachers, subjects, classrooms } = data
   const { globalConstraints, teacherConstraints, classroomConstraints, requirements } = input
-  
+
   const saturdayHours = timetable.saturdayHours
   const periods = [1, 2, 3, 4, 5, 6]
 
   // 制約情報の整理
   const constraints = buildConstraintInformation(input, teachers, subjects, classrooms)
-  
+
   const prompt = `あなたは学校の複数クラス時間割生成の専門家です。以下の複雑な制約条件を満たす、全クラスの統合時間割を生成してください。
 
 # 基本情報
@@ -248,48 +256,48 @@ ${requirements || '標準的な時間割配置'}
  */
 function buildConstraintInformation(
   input: BulkGenerateTimetableInput,
-  teachers: Array<{id: string; name: string}>,
-  subjects: Array<{id: string; name: string}>,
-  classrooms: Array<{id: string; name: string}>
+  teachers: Array<{ id: string; name: string }>,
+  subjects: Array<{ id: string; name: string }>,
+  classrooms: Array<{ id: string; name: string }>
 ): string {
   const constraints: string[] = []
-  
+
   // グローバル制約
   if (input.globalConstraints) {
     const gc = input.globalConstraints
-    
+
     if (gc.subjectDistribution === 'balanced') {
       constraints.push('・教科配置: バランス重視（各教科を均等に配置）')
     } else if (gc.subjectDistribution === 'concentrated') {
       constraints.push('・教科配置: 集中配置（同一教科をまとめて配置）')
     }
-    
+
     if (gc.timeSlotPreferences) {
       const tp = gc.timeSlotPreferences
       if (tp.morningSubjects?.length) {
-        const subjectNames = tp.morningSubjects.map(id => 
-          subjects.find(s => s.id === id)?.name || id
-        ).join('、')
+        const subjectNames = tp.morningSubjects
+          .map(id => subjects.find(s => s.id === id)?.name || id)
+          .join('、')
         constraints.push(`・午前推奨教科: ${subjectNames}`)
       }
       if (tp.afternoonSubjects?.length) {
-        const subjectNames = tp.afternoonSubjects.map(id => 
-          subjects.find(s => s.id === id)?.name || id
-        ).join('、')
+        const subjectNames = tp.afternoonSubjects
+          .map(id => subjects.find(s => s.id === id)?.name || id)
+          .join('、')
         constraints.push(`・午後推奨教科: ${subjectNames}`)
       }
     }
   }
-  
+
   // 教師制約
   if (input.teacherConstraints?.length) {
     constraints.push('・教師個別制約:')
     for (const tc of input.teacherConstraints) {
       const teacherName = teachers.find(t => t.id === tc.teacherId)?.name || tc.teacherId
       if (tc.unavailableSlots?.length) {
-        const slots = tc.unavailableSlots.map(slot => 
-          `${slot.dayOfWeek}曜${slot.period}時限`
-        ).join('、')
+        const slots = tc.unavailableSlots
+          .map(slot => `${slot.dayOfWeek}曜${slot.period}時限`)
+          .join('、')
         constraints.push(`  - ${teacherName}: 出勤不可 ${slots}`)
       }
       if (tc.maxDailyHours) {
@@ -297,26 +305,26 @@ function buildConstraintInformation(
       }
     }
   }
-  
+
   // 教室制約
   if (input.classroomConstraints?.length) {
     constraints.push('・教室個別制約:')
     for (const cc of input.classroomConstraints) {
       const roomName = classrooms.find(r => r.id === cc.classroomId)?.name || cc.classroomId
       if (cc.unavailableSlots?.length) {
-        const slots = cc.unavailableSlots.map(slot => 
-          `${slot.dayOfWeek}曜${slot.period}時限`
-        ).join('、')
+        const slots = cc.unavailableSlots
+          .map(slot => `${slot.dayOfWeek}曜${slot.period}時限`)
+          .join('、')
         constraints.push(`  - ${roomName}: 使用不可 ${slots}`)
       }
       if (cc.dedicatedSubjects?.length) {
-        const subjectNames = cc.dedicatedSubjects.map(id => 
-          subjects.find(s => s.id === id)?.name || id
-        ).join('、')
+        const subjectNames = cc.dedicatedSubjects
+          .map(id => subjects.find(s => s.id === id)?.name || id)
+          .join('、')
         constraints.push(`  - ${roomName}: 専用教科 ${subjectNames}`)
       }
     }
   }
-  
+
   return constraints.length > 0 ? constraints.join('\n') : '・標準制約のみ適用'
 }

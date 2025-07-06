@@ -34,7 +34,8 @@ export class LRUCache<T> {
   private hits = 0
   private misses = 0
 
-  constructor(maxSize: number = 1000, defaultTTL: number = 300000) { // デフォルト5分
+  constructor(maxSize: number = 1000, defaultTTL: number = 300000) {
+    // デフォルト5分
     this.maxSize = maxSize
     this.defaultTTL = defaultTTL
   }
@@ -44,7 +45,7 @@ export class LRUCache<T> {
    */
   get(key: string): T | null {
     const entry = this.cache.get(key)
-    
+
     if (!entry) {
       this.misses++
       return null
@@ -60,11 +61,11 @@ export class LRUCache<T> {
     // アクセス情報更新
     entry.accessCount++
     entry.lastAccessedAt = Date.now()
-    
+
     // LRU更新（Map は挿入順を保持するため、削除→再挿入でLRU実現）
     this.cache.delete(key)
     this.cache.set(key, entry)
-    
+
     this.hits++
     return entry.data
   }
@@ -95,7 +96,7 @@ export class LRUCache<T> {
       expiredAt,
       createdAt: now,
       accessCount: 0,
-      lastAccessedAt: now
+      lastAccessedAt: now,
     }
 
     this.cache.set(key, entry)
@@ -120,7 +121,7 @@ export class LRUCache<T> {
 
     let deletedCount = 0
     const regex = new RegExp(pattern)
-    
+
     for (const key of this.cache.keys()) {
       if (regex.test(key)) {
         this.cache.delete(key)
@@ -165,7 +166,7 @@ export class LRUCache<T> {
       if (newestEntry === undefined || entryAge < newestEntry) {
         newestEntry = entryAge
       }
-      
+
       // 概算メモリ使用量（JSON文字列長）
       memoryUsage += JSON.stringify(entry.data).length * 2 // 文字あたり2バイト概算
     }
@@ -181,7 +182,7 @@ export class LRUCache<T> {
       hitRate,
       memoryUsage,
       oldestEntry,
-      newestEntry
+      newestEntry,
     }
   }
 
@@ -199,7 +200,7 @@ export class LRUCache<T> {
  */
 class GlobalCache {
   private caches = new Map<string, LRUCache<any>>()
-  
+
   getCache<T>(name: string, maxSize?: number, defaultTTL?: number): LRUCache<T> {
     if (!this.caches.has(name)) {
       this.caches.set(name, new LRUCache<T>(maxSize, defaultTTL))
@@ -247,13 +248,13 @@ export function cached<T>(
   keyGenerator: (...args: any[]) => string,
   ttl?: number
 ) {
-  return function(target: any, propertyName: string, descriptor: PropertyDescriptor) {
+  return (target: any, propertyName: string, descriptor: PropertyDescriptor) => {
     const method = descriptor.value
     const cache = getCache<T>(cacheName)
 
-    descriptor.value = async function(...args: any[]) {
+    descriptor.value = async function (...args: any[]) {
       const key = keyGenerator(...args)
-      
+
       // キャッシュヒット確認
       const cached = cache.get(key)
       if (cached !== null) {
@@ -262,10 +263,10 @@ export function cached<T>(
 
       // キャッシュミス - 実際の処理実行
       const result = await method.apply(this, args)
-      
+
       // 結果をキャッシュに保存
       cache.set(key, result, ttl)
-      
+
       return result
     }
   }
@@ -280,7 +281,7 @@ export async function cachedQuery<T>(
   ttl: number = 300000 // 5分
 ): Promise<T> {
   const cache = getCache<T>('database-queries', 500, ttl)
-  
+
   const cached = cache.get(cacheKey)
   if (cached !== null) {
     return cached
@@ -288,7 +289,7 @@ export async function cachedQuery<T>(
 
   const result = await queryFn()
   cache.set(cacheKey, result, ttl)
-  
+
   return result
 }
 
@@ -301,7 +302,7 @@ export async function cachedApiResponse<T>(
   ttl: number = 60000 // 1分
 ): Promise<T> {
   const cache = getCache<T>('api-responses', 200, ttl)
-  
+
   const cached = cache.get(cacheKey)
   if (cached !== null) {
     return cached
@@ -309,7 +310,7 @@ export async function cachedApiResponse<T>(
 
   const result = await apiFn()
   cache.set(cacheKey, result, ttl)
-  
+
   return result
 }
 
@@ -323,12 +324,12 @@ export async function cachedConstraintValidation<T>(
   ttl: number = 120000 // 2分
 ): Promise<T> {
   const cache = getCache<T>('constraint-validations', 100, ttl)
-  
+
   // スケジュールデータのハッシュを生成してキャッシュキーとする
   const scheduleHash = hashObject(schedules)
   const constraintHash = hashObject(constraints)
   const cacheKey = `${scheduleHash}-${constraintHash}`
-  
+
   const cached = cache.get(cacheKey)
   if (cached !== null) {
     return cached
@@ -336,7 +337,7 @@ export async function cachedConstraintValidation<T>(
 
   const result = await validationFn()
   cache.set(cacheKey, result, ttl)
-  
+
   return result
 }
 
@@ -348,7 +349,7 @@ function hashObject(obj: any): string {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
+    hash = (hash << 5) - hash + char
     hash = hash & hash // 32bit整数に変換
   }
   return hash.toString(36)
@@ -378,7 +379,8 @@ export function clearAllCaches(): void {
 /**
  * 自動クリーンアップの定期実行
  */
-export function startCacheCleanup(intervalMs: number = 600000) { // 10分間隔
+export function startCacheCleanup(intervalMs: number = 600000) {
+  // 10分間隔
   setInterval(() => {
     const results = cleanupAllCaches()
     const totalCleaned = Object.values(results).reduce((sum, count) => sum + count, 0)

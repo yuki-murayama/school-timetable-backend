@@ -3,8 +3,8 @@
  * 全てのAPIドキュメント定義をまとめて管理
  */
 
-import { OpenAPIHono } from '@hono/zod-openapi'
 import { swaggerUI } from '@hono/swagger-ui'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import type { Env } from '../../lib/db'
 
 // ドキュメント定義のインポート
@@ -70,56 +70,56 @@ Cloudflare Workers の制限に準拠します。
       `,
       contact: {
         name: 'API Support',
-        email: 'support@school-timetable.com'
+        email: 'support@school-timetable.com',
       },
       license: {
         name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT'
-      }
+        url: 'https://opensource.org/licenses/MIT',
+      },
     },
     servers: [
       {
         url: 'https://school-timetable-backend.malah-shunmu.workers.dev',
-        description: 'Production server (Cloudflare Workers)'
+        description: 'Production server (Cloudflare Workers)',
       },
       {
         url: 'http://localhost:3000',
-        description: 'Development server'
-      }
+        description: 'Development server',
+      },
     ],
     tags: [
-      { 
-        name: 'Schools', 
-        description: '🏫 学校管理 - 学校の基本情報を管理'
+      {
+        name: 'Schools',
+        description: '🏫 学校管理 - 学校の基本情報を管理',
       },
-      { 
-        name: 'Classes', 
-        description: '📚 クラス管理 - 学年・クラスの編成を管理'
+      {
+        name: 'Classes',
+        description: '📚 クラス管理 - 学年・クラスの編成を管理',
       },
-      { 
-        name: 'Teachers', 
-        description: '👨‍🏫 教師管理 - 教師情報と担当教科を管理'
+      {
+        name: 'Teachers',
+        description: '👨‍🏫 教師管理 - 教師情報と担当教科を管理',
       },
-      { 
-        name: 'Subjects', 
-        description: '📖 教科管理 - 教科の登録と設定を管理'
+      {
+        name: 'Subjects',
+        description: '📖 教科管理 - 教科の登録と設定を管理',
       },
-      { 
-        name: 'Classrooms', 
-        description: '🏛️ 教室管理 - 教室タイプと定員を管理'
+      {
+        name: 'Classrooms',
+        description: '🏛️ 教室管理 - 教室タイプと定員を管理',
       },
-      { 
-        name: 'Timetables', 
-        description: '📅 時間割管理 - 時間割の作成・生成・管理'
+      {
+        name: 'Timetables',
+        description: '📅 時間割管理 - 時間割の作成・生成・管理',
       },
-      { 
-        name: 'Constraints', 
-        description: '🔧 制約条件管理 - 拡張可能な制約システム'
+      {
+        name: 'Constraints',
+        description: '🔧 制約条件管理 - 拡張可能な制約システム',
       },
-      { 
-        name: 'Test', 
-        description: '🧪 テスト用エンドポイント - 開発・テスト用機能'
-      }
+      {
+        name: 'Test',
+        description: '🧪 テスト用エンドポイント - 開発・テスト用機能',
+      },
     ],
     components: {
       securitySchemes: {
@@ -127,40 +127,43 @@ Cloudflare Workers の制限に準拠します。
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'JWT Bearer Token (将来の認証用)'
-        }
-      }
-    }
+          description: 'JWT Bearer Token (将来の認証用)',
+        },
+      },
+    },
   })
 
   // Swagger UI の設定
-  app.get('/ui', swaggerUI({ 
-    url: '/docs/doc',
-    config: {
-      deepLinking: true,
-      displayOperationId: false,
-      defaultModelsExpandDepth: 1,
-      defaultModelExpandDepth: 1,
-      defaultModelRendering: 'example',
-      displayRequestDuration: true,
-      docExpansion: 'list',
-      filter: true,
-      showExtensions: true,
-      showCommonExtensions: true,
-      tryItOutEnabled: true
-    }
-  }))
+  app.get(
+    '/ui',
+    swaggerUI({
+      url: '/docs/doc',
+      config: {
+        deepLinking: true,
+        displayOperationId: false,
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1,
+        defaultModelRendering: 'example',
+        displayRequestDuration: true,
+        docExpansion: 'list',
+        filter: true,
+        showExtensions: true,
+        showCommonExtensions: true,
+        tryItOutEnabled: true,
+      },
+    })
+  )
 
   // OpenAPI JSON ダウンロード
-  app.get('/openapi.json', (c) => {
+  app.get('/openapi.json', c => {
     // ドキュメント生成の際に使用
     return c.json({
-      message: 'OpenAPI仕様書をダウンロードするには /docs/doc にアクセスしてください'
+      message: 'OpenAPI仕様書をダウンロードするには /docs/doc にアクセスしてください',
     })
   })
 
   // カスタムドキュメントページ
-  app.get('/', (c) => {
+  app.get('/', c => {
     return c.html(`
 <!DOCTYPE html>
 <html lang="ja">
@@ -231,7 +234,7 @@ Cloudflare Workers の制限に準拠します。
 export function registerAllRoutes(app: OpenAPIHono<{ Bindings: Env }>) {
   // 制約条件関連のルート
   for (const route of constraintRoutes) {
-    app.openapi(route, async (c) => {
+    app.openapi(route, async c => {
       // 実際のハンドラーは既存のルーターから呼び出す
       return c.json({ message: 'このエンドポイントの実装は /api/constraints から利用してください' })
     })
@@ -239,7 +242,7 @@ export function registerAllRoutes(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // 時間割関連のルート
   for (const route of timetableRoutes) {
-    app.openapi(route, async (c) => {
+    app.openapi(route, async c => {
       // 実際のハンドラーは既存のルーターから呼び出す
       return c.json({ message: 'このエンドポイントの実装は /api/timetables から利用してください' })
     })

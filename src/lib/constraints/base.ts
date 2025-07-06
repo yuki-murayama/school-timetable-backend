@@ -69,17 +69,17 @@ export interface ConstraintContext {
 // 制約バリデーターの基底インターフェース
 export interface ConstraintValidator {
   readonly definition: ConstraintDefinition
-  
+
   /**
    * 制約条件を検証
    */
   validate(context: ConstraintContext): Promise<ConstraintValidationResult>
-  
+
   /**
    * 制約条件が適用可能かチェック
    */
   isApplicable(context: ConstraintContext): boolean
-  
+
   /**
    * パラメータのバリデーション
    */
@@ -89,22 +89,22 @@ export interface ConstraintValidator {
 // 制約バリデーターの抽象基底クラス
 export abstract class BaseConstraintValidator implements ConstraintValidator {
   abstract readonly definition: ConstraintDefinition
-  
+
   abstract validate(context: ConstraintContext): Promise<ConstraintValidationResult>
-  
+
   isApplicable(context: ConstraintContext): boolean {
     // デフォルト実装: 常に適用可能
     return this.definition.enabled
   }
-  
+
   validateParameters(parameters: Record<string, any>): { isValid: boolean; errors: string[] } {
     // デフォルト実装: パラメータ検証なし
     return { isValid: true, errors: [] }
   }
-  
+
   protected createViolation(
-    code: string, 
-    message: string, 
+    code: string,
+    message: string,
     severity: 'error' | 'warning' | 'info' = 'error',
     affectedSchedules: Array<any> = [],
     metadata?: Record<string, any>
@@ -114,15 +114,17 @@ export abstract class BaseConstraintValidator implements ConstraintValidator {
       message,
       severity,
       affectedSchedules,
-      metadata
+      metadata,
     }
   }
-  
-  protected measurePerformance<T>(fn: () => Promise<T>): Promise<{ result: T; executionTime: number }> {
+
+  protected measurePerformance<T>(
+    fn: () => Promise<T>
+  ): Promise<{ result: T; executionTime: number }> {
     const start = performance.now()
     return fn().then(result => ({
       result,
-      executionTime: performance.now() - start
+      executionTime: performance.now() - start,
     }))
   }
 }
@@ -130,28 +132,28 @@ export abstract class BaseConstraintValidator implements ConstraintValidator {
 // 制約管理サービス
 export class ConstraintManager {
   private validators = new Map<string, ConstraintValidator>()
-  
+
   /**
    * 制約バリデーターを登録
    */
   register(validator: ConstraintValidator): void {
     this.validators.set(validator.definition.id, validator)
   }
-  
+
   /**
    * 制約バリデーターを削除
    */
   unregister(constraintId: string): void {
     this.validators.delete(constraintId)
   }
-  
+
   /**
    * 利用可能な制約条件一覧を取得
    */
   getAvailableConstraints(): ConstraintDefinition[] {
     return Array.from(this.validators.values()).map(v => v.definition)
   }
-  
+
   /**
    * 有効な制約条件を取得
    */
@@ -160,14 +162,14 @@ export class ConstraintManager {
       .filter(v => v.definition.enabled)
       .sort((a, b) => b.definition.priority - a.definition.priority)
   }
-  
+
   /**
    * 特定の制約バリデーターを取得
    */
   getValidator(constraintId: string): ConstraintValidator | undefined {
     return this.validators.get(constraintId)
   }
-  
+
   /**
    * 全制約条件を検証
    */
@@ -184,16 +186,16 @@ export class ConstraintManager {
     const start = performance.now()
     const allViolations: ConstraintViolation[] = []
     const enabledValidators = this.getEnabledConstraints()
-    
+
     let appliedConstraints = 0
-    
+
     for (const validator of enabledValidators) {
       if (!validator.isApplicable(context)) {
         continue
       }
-      
+
       appliedConstraints++
-      
+
       try {
         const result = await validator.validate(context)
         allViolations.push(...result.violations)
@@ -203,17 +205,17 @@ export class ConstraintManager {
           code: `${validator.definition.id}_VALIDATION_ERROR`,
           message: `制約検証中にエラーが発生しました: ${error instanceof Error ? error.message : 'Unknown error'}`,
           severity: 'error',
-          affectedSchedules: []
+          affectedSchedules: [],
         })
       }
     }
-    
+
     const violationsBySeverity = {
       error: allViolations.filter(v => v.severity === 'error').length,
       warning: allViolations.filter(v => v.severity === 'warning').length,
-      info: allViolations.filter(v => v.severity === 'info').length
+      info: allViolations.filter(v => v.severity === 'info').length,
     }
-    
+
     return {
       isValid: violationsBySeverity.error === 0,
       violations: allViolations,
@@ -221,31 +223,32 @@ export class ConstraintManager {
         totalConstraints: enabledValidators.length,
         appliedConstraints,
         executionTime: performance.now() - start,
-        violationsBySeverity
-      }
+        violationsBySeverity,
+      },
     }
   }
-  
+
   /**
    * 特定カテゴリの制約のみ検証
    */
   async validateByCategory(
-    context: ConstraintContext, 
+    context: ConstraintContext,
     category: ConstraintDefinition['category']
   ): Promise<ConstraintValidationResult> {
-    const validators = this.getEnabledConstraints()
-      .filter(v => v.definition.category === category && v.isApplicable(context))
-    
+    const validators = this.getEnabledConstraints().filter(
+      v => v.definition.category === category && v.isApplicable(context)
+    )
+
     const allViolations: ConstraintViolation[] = []
-    
+
     for (const validator of validators) {
       const result = await validator.validate(context)
       allViolations.push(...result.violations)
     }
-    
+
     return {
       isValid: allViolations.filter(v => v.severity === 'error').length === 0,
-      violations: allViolations
+      violations: allViolations,
     }
   }
 }

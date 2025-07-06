@@ -3,13 +3,13 @@
  * D1に依存しない純粋なロジックのテスト
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
-  CreateSchoolSchema,
-  UpdateSchoolSchema,
   CreateClassSchema,
-  UpdateClassSchema,
+  CreateSchoolSchema,
   CreateTeacherSchema,
+  UpdateClassSchema,
+  UpdateSchoolSchema,
   UpdateTeacherSchema,
 } from './validation'
 

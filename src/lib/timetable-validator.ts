@@ -3,9 +3,9 @@
  * Claude APIから生成された時間割データの妥当性をチェック
  */
 
-import { eq, and } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { DrizzleDb } from '../db'
-import { classes, subjects, teachers, classrooms, teacherSubjects } from '../db/schema'
+import { classes, classrooms, subjects, teacherSubjects, teachers } from '../db/schema'
 
 interface ScheduleSlot {
   classId: string
@@ -59,18 +59,21 @@ export async function validateGeneratedTimetable(
     }
 
     // 学校内の有効なIDを取得
-    const [validClasses, validSubjects, validTeachers, validClassrooms, teacherSubjectMappings] = await Promise.all([
-      db.select({ id: classes.id }).from(classes).where(eq(classes.schoolId, schoolId)),
-      db.select({ id: subjects.id }).from(subjects).where(eq(subjects.schoolId, schoolId)),
-      db.select({ id: teachers.id }).from(teachers).where(eq(teachers.schoolId, schoolId)),
-      db.select({ id: classrooms.id }).from(classrooms).where(eq(classrooms.schoolId, schoolId)),
-      db.select({
-        teacherId: teacherSubjects.teacherId,
-        subjectId: teacherSubjects.subjectId,
-      }).from(teacherSubjects)
-        .leftJoin(teachers, eq(teacherSubjects.teacherId, teachers.id))
-        .where(eq(teachers.schoolId, schoolId))
-    ])
+    const [validClasses, validSubjects, validTeachers, validClassrooms, teacherSubjectMappings] =
+      await Promise.all([
+        db.select({ id: classes.id }).from(classes).where(eq(classes.schoolId, schoolId)),
+        db.select({ id: subjects.id }).from(subjects).where(eq(subjects.schoolId, schoolId)),
+        db.select({ id: teachers.id }).from(teachers).where(eq(teachers.schoolId, schoolId)),
+        db.select({ id: classrooms.id }).from(classrooms).where(eq(classrooms.schoolId, schoolId)),
+        db
+          .select({
+            teacherId: teacherSubjects.teacherId,
+            subjectId: teacherSubjects.subjectId,
+          })
+          .from(teacherSubjects)
+          .leftJoin(teachers, eq(teacherSubjects.teacherId, teachers.id))
+          .where(eq(teachers.schoolId, schoolId)),
+      ])
 
     const validClassIds = new Set(validClasses.map(c => c.id))
     const validSubjectIds = new Set(validSubjects.map(s => s.id))
@@ -107,30 +110,31 @@ export async function validateGeneratedTimetable(
         conflictDetails.push({
           type: 'invalid_id',
           description: `スロット検証エラー: ${slotErrors.join(', ')}`,
-          affectedSlots: [slot]
+          affectedSlots: [slot],
         })
         continue
       }
 
       // 時間枠の重複チェック
       const timeKey = `${slot.dayOfWeek}-${slot.period}`
-      
+
       // 教師の重複チェック
       if (!teacherSchedules.has(slot.teacherId)) {
         teacherSchedules.set(slot.teacherId, new Set())
       }
-      
+
       if (teacherSchedules.get(slot.teacherId)!.has(timeKey)) {
-        const conflictingSlots = timetableData.schedules.filter(s => 
-          s.teacherId === slot.teacherId && 
-          s.dayOfWeek === slot.dayOfWeek && 
-          s.period === slot.period
+        const conflictingSlots = timetableData.schedules.filter(
+          s =>
+            s.teacherId === slot.teacherId &&
+            s.dayOfWeek === slot.dayOfWeek &&
+            s.period === slot.period
         )
-        
+
         conflictDetails.push({
           type: 'teacher',
           description: `教師 ${slot.teacherId} が ${slot.dayOfWeek}曜日 ${slot.period}時限に重複して配置されています`,
-          affectedSlots: conflictingSlots
+          affectedSlots: conflictingSlots,
         })
         errors.push(`教師の時間重複: ${slot.teacherId} (${slot.dayOfWeek}曜日 ${slot.period}時限)`)
       }
@@ -140,20 +144,23 @@ export async function validateGeneratedTimetable(
       if (!classroomSchedules.has(slot.classroomId)) {
         classroomSchedules.set(slot.classroomId, new Set())
       }
-      
+
       if (classroomSchedules.get(slot.classroomId)!.has(timeKey)) {
-        const conflictingSlots = timetableData.schedules.filter(s => 
-          s.classroomId === slot.classroomId && 
-          s.dayOfWeek === slot.dayOfWeek && 
-          s.period === slot.period
+        const conflictingSlots = timetableData.schedules.filter(
+          s =>
+            s.classroomId === slot.classroomId &&
+            s.dayOfWeek === slot.dayOfWeek &&
+            s.period === slot.period
         )
-        
+
         conflictDetails.push({
           type: 'classroom',
           description: `教室 ${slot.classroomId} が ${slot.dayOfWeek}曜日 ${slot.period}時限に重複して配置されています`,
-          affectedSlots: conflictingSlots
+          affectedSlots: conflictingSlots,
         })
-        errors.push(`教室の時間重複: ${slot.classroomId} (${slot.dayOfWeek}曜日 ${slot.period}時限)`)
+        errors.push(
+          `教室の時間重複: ${slot.classroomId} (${slot.dayOfWeek}曜日 ${slot.period}時限)`
+        )
       }
       classroomSchedules.get(slot.classroomId)!.add(timeKey)
     }
@@ -171,15 +178,14 @@ export async function validateGeneratedTimetable(
       isValid: errors.length === 0,
       errors,
       warnings,
-      conflictDetails: conflictDetails.length > 0 ? conflictDetails : undefined
+      conflictDetails: conflictDetails.length > 0 ? conflictDetails : undefined,
     }
-
   } catch (error) {
     console.error('時間割検証エラー:', error)
     return {
       isValid: false,
       errors: ['時間割検証中にエラーが発生しました'],
-      warnings
+      warnings,
     }
   }
 }
@@ -286,7 +292,14 @@ export function validateTimetableStructure(data: any): data is GeneratedTimetabl
       return false
     }
 
-    const requiredFields = ['classId', 'subjectId', 'teacherId', 'classroomId', 'dayOfWeek', 'period']
+    const requiredFields = [
+      'classId',
+      'subjectId',
+      'teacherId',
+      'classroomId',
+      'dayOfWeek',
+      'period',
+    ]
     for (const field of requiredFields) {
       if (!(field in slot)) {
         return false
@@ -299,10 +312,12 @@ export function validateTimetableStructure(data: any): data is GeneratedTimetabl
     }
 
     // 文字列フィールドの検証
-    if (typeof slot.classId !== 'string' || 
-        typeof slot.subjectId !== 'string' || 
-        typeof slot.teacherId !== 'string' || 
-        typeof slot.classroomId !== 'string') {
+    if (
+      typeof slot.classId !== 'string' ||
+      typeof slot.subjectId !== 'string' ||
+      typeof slot.teacherId !== 'string' ||
+      typeof slot.classroomId !== 'string'
+    ) {
       return false
     }
   }

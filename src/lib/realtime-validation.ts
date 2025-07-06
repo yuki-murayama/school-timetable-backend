@@ -3,8 +3,8 @@
  * フロントエンドでの即座な制約チェック用
  */
 
+import { getConstraintManager, validateTimetableConstraints } from './constraints/manager'
 import type { DrizzleDb } from './db'
-import { validateTimetableConstraints, getConstraintManager } from './constraints/manager'
 
 // 軽量制約検証用の型定義
 export interface QuickScheduleData {
@@ -42,8 +42,9 @@ export async function quickValidation(
   } = {}
 ): Promise<QuickValidationResult> {
   const startTime = Date.now()
-  const { checkTypes = ['teacher_conflict', 'classroom_conflict'], maxExecutionTime = 100 } = options
-  
+  const { checkTypes = ['teacher_conflict', 'classroom_conflict'], maxExecutionTime = 100 } =
+    options
+
   const violations = []
 
   try {
@@ -64,7 +65,7 @@ export async function quickValidation(
     }
 
     const executionTime = Date.now() - startTime
-    
+
     // 実行時間制限チェック
     if (executionTime > maxExecutionTime) {
       console.warn(`Quick validation exceeded time limit: ${executionTime}ms`)
@@ -73,18 +74,20 @@ export async function quickValidation(
     return {
       isValid: violations.filter(v => v.type === 'conflict').length === 0,
       violations,
-      executionTime
+      executionTime,
     }
   } catch (error) {
     console.error('Quick validation error:', error)
     return {
       isValid: false,
-      violations: [{
-        type: 'conflict',
-        message: '検証処理でエラーが発生しました',
-        affectedCells: []
-      }],
-      executionTime: Date.now() - startTime
+      violations: [
+        {
+          type: 'conflict',
+          message: '検証処理でエラーが発生しました',
+          affectedCells: [],
+        },
+      ],
+      executionTime: Date.now() - startTime,
     }
   }
 }
@@ -100,16 +103,16 @@ function findTeacherConflicts(schedules: QuickScheduleData[]) {
   for (const schedule of schedules) {
     const teacherId = schedule.teacherId
     const timeSlot = `${schedule.dayOfWeek}-${schedule.period}`
-    
+
     if (!teacherSlots.has(teacherId)) {
       teacherSlots.set(teacherId, new Map())
     }
-    
+
     const teacherTimeSlots = teacherSlots.get(teacherId)!
     if (!teacherTimeSlots.has(timeSlot)) {
       teacherTimeSlots.set(timeSlot, [])
     }
-    
+
     teacherTimeSlots.get(timeSlot)!.push(schedule)
   }
 
@@ -124,8 +127,8 @@ function findTeacherConflicts(schedules: QuickScheduleData[]) {
           affectedCells: conflictingSchedules.map(s => ({
             classId: s.classId,
             dayOfWeek: s.dayOfWeek,
-            period: s.period
-          }))
+            period: s.period,
+          })),
         })
       }
     }
@@ -145,16 +148,16 @@ function findClassroomConflicts(schedules: QuickScheduleData[]) {
   for (const schedule of schedules) {
     const classroomId = schedule.classroomId
     const timeSlot = `${schedule.dayOfWeek}-${schedule.period}`
-    
+
     if (!classroomSlots.has(classroomId)) {
       classroomSlots.set(classroomId, new Map())
     }
-    
+
     const classroomTimeSlots = classroomSlots.get(classroomId)!
     if (!classroomTimeSlots.has(timeSlot)) {
       classroomTimeSlots.set(timeSlot, [])
     }
-    
+
     classroomTimeSlots.get(timeSlot)!.push(schedule)
   }
 
@@ -169,8 +172,8 @@ function findClassroomConflicts(schedules: QuickScheduleData[]) {
           affectedCells: conflictingSchedules.map(s => ({
             classId: s.classId,
             dayOfWeek: s.dayOfWeek,
-            period: s.period
-          }))
+            period: s.period,
+          })),
         })
       }
     }
@@ -191,11 +194,13 @@ function validateBasicRules(schedules: QuickScheduleData[]) {
       violations.push({
         type: 'warning' as const,
         message: `無効な曜日です: ${schedule.dayOfWeek}`,
-        affectedCells: [{
-          classId: schedule.classId,
-          dayOfWeek: schedule.dayOfWeek,
-          period: schedule.period
-        }]
+        affectedCells: [
+          {
+            classId: schedule.classId,
+            dayOfWeek: schedule.dayOfWeek,
+            period: schedule.period,
+          },
+        ],
       })
     }
 
@@ -204,11 +209,13 @@ function validateBasicRules(schedules: QuickScheduleData[]) {
       violations.push({
         type: 'warning' as const,
         message: `無効な時限です: ${schedule.period}`,
-        affectedCells: [{
-          classId: schedule.classId,
-          dayOfWeek: schedule.dayOfWeek,
-          period: schedule.period
-        }]
+        affectedCells: [
+          {
+            classId: schedule.classId,
+            dayOfWeek: schedule.dayOfWeek,
+            period: schedule.period,
+          },
+        ],
       })
     }
 
@@ -217,11 +224,13 @@ function validateBasicRules(schedules: QuickScheduleData[]) {
       violations.push({
         type: 'warning' as const,
         message: '必須フィールドが不足しています',
-        affectedCells: [{
-          classId: schedule.classId,
-          dayOfWeek: schedule.dayOfWeek,
-          period: schedule.period
-        }]
+        affectedCells: [
+          {
+            classId: schedule.classId,
+            dayOfWeek: schedule.dayOfWeek,
+            period: schedule.period,
+          },
+        ],
       })
     }
   }
@@ -242,11 +251,11 @@ export async function partialValidation(
   } = {}
 ): Promise<QuickValidationResult> {
   const startTime = Date.now()
-  
+
   try {
     // まず軽量検証を実行
     const quickResult = await quickValidation(schedules, {
-      checkTypes: ['teacher_conflict', 'classroom_conflict', 'basic_validation']
+      checkTypes: ['teacher_conflict', 'classroom_conflict', 'basic_validation'],
     })
 
     // 重大な競合がある場合は、詳細検証をスキップ
@@ -255,36 +264,35 @@ export async function partialValidation(
     }
 
     // 詳細制約検証（制限付き）
-    const constraintResult = await validateTimetableConstraints(
-      db,
-      timetableId,
-      schedules,
-      {
-        schoolId: options.schoolId || 'partial-validation',
-        saturdayHours: 0,
-        enabledConstraints: options.constraints || ['teacher_conflict', 'classroom_conflict']
-      }
-    )
+    const constraintResult = await validateTimetableConstraints(db, timetableId, schedules, {
+      schoolId: options.schoolId || 'partial-validation',
+      saturdayHours: 0,
+      enabledConstraints: options.constraints || ['teacher_conflict', 'classroom_conflict'],
+    })
 
     const detailedViolations = constraintResult.violations.map(v => ({
-      type: v.severity === 'error' ? 'conflict' as const : 
-            v.severity === 'warning' ? 'warning' as const : 'info' as const,
+      type:
+        v.severity === 'error'
+          ? ('conflict' as const)
+          : v.severity === 'warning'
+            ? ('warning' as const)
+            : ('info' as const),
       message: v.message,
       affectedCells: v.affectedSchedules.map(s => ({
         classId: s.classId,
         dayOfWeek: s.dayOfWeek,
-        period: s.period
-      }))
+        period: s.period,
+      })),
     }))
 
     return {
       isValid: constraintResult.isValid,
       violations: [...quickResult.violations, ...detailedViolations],
-      executionTime: Date.now() - startTime
+      executionTime: Date.now() - startTime,
     }
   } catch (error) {
     console.error('Partial validation error:', error)
-    
+
     // エラー時は軽量検証の結果を返す
     const quickResult = await quickValidation(schedules)
     return {
@@ -294,9 +302,9 @@ export async function partialValidation(
         {
           type: 'warning',
           message: '詳細検証でエラーが発生しました。基本チェックのみ実行されています。',
-          affectedCells: []
-        }
-      ]
+          affectedCells: [],
+        },
+      ],
     }
   }
 }
@@ -315,6 +323,6 @@ export function generateQuickSummary(violations: QuickValidationResult['violatio
     warningCount,
     infoCount,
     hasBlockingIssues: conflictCount > 0,
-    severity: conflictCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'info'
+    severity: conflictCount > 0 ? 'error' : warningCount > 0 ? 'warning' : 'info',
   }
 }

@@ -3,9 +3,9 @@
  * 制約バリデーターの一元管理とコンテキスト提供
  */
 
+import type { DrizzleDb } from '../db'
 import { ConstraintManager } from './base'
 import { DEFAULT_VALIDATORS } from './validators'
-import type { DrizzleDb } from '../db'
 
 // グローバル制約マネージャーインスタンス
 let globalConstraintManager: ConstraintManager | null = null
@@ -19,7 +19,7 @@ export function initializeConstraintManager(): ConstraintManager {
   }
 
   const manager = new ConstraintManager()
-  
+
   // デフォルト制約バリデーターを登録
   for (const validator of DEFAULT_VALIDATORS) {
     manager.register(validator)
@@ -61,17 +61,17 @@ export async function validateTimetableConstraints(
   }
 ) {
   const manager = getConstraintManager()
-  
+
   // メタデータの取得
   const metadata = await fetchConstraintMetadata(db, options.schoolId)
-  
+
   const context = {
     db,
     timetableId,
     schoolId: options.schoolId,
     saturdayHours: options.saturdayHours,
     schedules,
-    metadata
+    metadata,
   }
 
   // 制約フィルタリング
@@ -107,9 +107,13 @@ async function fetchConstraintMetadata(db: DrizzleDb, schoolId: string) {
   // ここでは型安全性のためのダミーデータを返す
   return {
     classes: [] as Array<{ id: string; name: string; grade: number }>,
-    teachers: [] as Array<{ id: string; name: string; subjects: Array<{ id: string; name: string }> }>,
+    teachers: [] as Array<{
+      id: string
+      name: string
+      subjects: Array<{ id: string; name: string }>
+    }>,
     subjects: [] as Array<{ id: string; name: string }>,
-    classrooms: [] as Array<{ id: string; name: string; type: string; capacity?: number }>
+    classrooms: [] as Array<{ id: string; name: string; type: string; capacity?: number }>,
   }
 }
 
@@ -125,11 +129,11 @@ export function updateConstraintSettings(
 ): { success: boolean; errors: string[] } {
   const manager = getConstraintManager()
   const validator = manager.getValidator(constraintId)
-  
+
   if (!validator) {
     return {
       success: false,
-      errors: [`制約 ${constraintId} が見つかりません`]
+      errors: [`制約 ${constraintId} が見つかりません`],
     }
   }
 
@@ -155,7 +159,7 @@ export function updateConstraintSettings(
   if (settings.parameters) {
     validator.definition.parameters = {
       ...validator.definition.parameters,
-      ...settings.parameters
+      ...settings.parameters,
     }
   }
 
@@ -170,7 +174,7 @@ export function getAvailableConstraints() {
   return manager.getAvailableConstraints().map(constraint => ({
     ...constraint,
     // パラメータのスキーマ情報を追加
-    parameterSchema: generateParameterSchema(constraint.id)
+    parameterSchema: generateParameterSchema(constraint.id),
   }))
 }
 
@@ -180,14 +184,14 @@ export function getAvailableConstraints() {
 function generateParameterSchema(constraintId: string): Record<string, any> {
   const manager = getConstraintManager()
   const validator = manager.getValidator(constraintId)
-  
+
   if (!validator || !validator.definition.parameters) {
     return {}
   }
 
   // パラメータの型情報を生成（実装簡略化）
   const schema: Record<string, any> = {}
-  
+
   for (const [key, value] of Object.entries(validator.definition.parameters)) {
     schema[key] = {
       type: typeof value,

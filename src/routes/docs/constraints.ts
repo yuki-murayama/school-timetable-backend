@@ -3,13 +3,13 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi'
-import { 
-  ErrorSchema, 
-  SuccessSchema,
+import {
   ConstraintDefinitionSchema,
   ConstraintValidationResultSchema,
   ConstraintViolationSchema,
-  createAPIRoute 
+  createAPIRoute,
+  ErrorSchema,
+  SuccessSchema,
 } from '../../lib/openapi'
 
 // 制約条件一覧取得
@@ -18,7 +18,8 @@ export const getConstraintsRoute = createAPIRoute({
   path: '/api/constraints',
   tags: ['Constraints'],
   summary: '利用可能な制約条件一覧を取得',
-  description: 'システムに登録されている全ての制約条件の一覧を取得します。各制約条件の設定状態も含まれます。',
+  description:
+    'システムに登録されている全ての制約条件の一覧を取得します。各制約条件の設定状態も含まれます。',
   responses: {
     200: {
       content: {
@@ -28,22 +29,22 @@ export const getConstraintsRoute = createAPIRoute({
             data: z.object({
               constraints: z.array(ConstraintDefinitionSchema),
               total: z.number().openapi({ example: 4 }),
-              enabledCount: z.number().openapi({ example: 3 })
-            })
-          })
-        }
+              enabledCount: z.number().openapi({ example: 3 }),
+            }),
+          }),
+        },
       },
-      description: '制約条件一覧の取得に成功'
+      description: '制約条件一覧の取得に成功',
     },
     500: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'サーバーエラー'
-    }
-  }
+      description: 'サーバーエラー',
+    },
+  },
 })
 
 // 特定制約条件の詳細取得
@@ -55,12 +56,12 @@ export const getConstraintDetailRoute = createAPIRoute({
   description: '指定されたIDの制約条件の詳細情報を取得します。',
   request: {
     params: z.object({
-      constraintId: z.string().openapi({ 
+      constraintId: z.string().openapi({
         param: { name: 'constraintId', in: 'path' },
         example: 'teacher_conflict',
-        description: '制約条件ID'
-      })
-    })
+        description: '制約条件ID',
+      }),
+    }),
   },
   responses: {
     200: {
@@ -69,30 +70,30 @@ export const getConstraintDetailRoute = createAPIRoute({
           schema: z.object({
             success: z.boolean(),
             data: z.object({
-              constraint: ConstraintDefinitionSchema
-            })
-          })
-        }
+              constraint: ConstraintDefinitionSchema,
+            }),
+          }),
+        },
       },
-      description: '制約条件詳細の取得に成功'
+      description: '制約条件詳細の取得に成功',
     },
     404: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: '制約条件が見つからない'
+      description: '制約条件が見つからない',
     },
     500: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'サーバーエラー'
-    }
-  }
+      description: 'サーバーエラー',
+    },
+  },
 })
 
 // 制約条件設定更新
@@ -104,66 +105,69 @@ export const updateConstraintSettingsRoute = createAPIRoute({
   description: '指定された制約条件の有効/無効状態やパラメータを更新します。',
   request: {
     params: z.object({
-      constraintId: z.string().openapi({ 
+      constraintId: z.string().openapi({
         param: { name: 'constraintId', in: 'path' },
         example: 'teacher_conflict',
-        description: '制約条件ID'
-      })
+        description: '制約条件ID',
+      }),
     }),
     body: {
       content: {
         'application/json': {
           schema: z.object({
-            enabled: z.boolean().optional().openapi({ 
+            enabled: z.boolean().optional().openapi({
               example: true,
-              description: '制約条件の有効/無効'
+              description: '制約条件の有効/無効',
             }),
-            parameters: z.record(z.any()).optional().openapi({
-              example: {
-                strictMode: false,
-                allowPartTime: true
-              },
-              description: '制約条件のパラメータ'
-            })
-          })
-        }
-      }
-    }
+            parameters: z
+              .record(z.any())
+              .optional()
+              .openapi({
+                example: {
+                  strictMode: false,
+                  allowPartTime: true,
+                },
+                description: '制約条件のパラメータ',
+              }),
+          }),
+        },
+      },
+    },
   },
   responses: {
     200: {
       content: {
         'application/json': {
-          schema: SuccessSchema
-        }
+          schema: SuccessSchema,
+        },
       },
-      description: '制約条件設定の更新に成功'
+      description: '制約条件設定の更新に成功',
     },
     400: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'バリデーションエラー'
+      description: 'バリデーションエラー',
     },
     404: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: '制約条件が見つからない'
+      description: '制約条件が見つからない',
     },
     500: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'サーバーエラー'
-    }
-  }
+      description: 'サーバーエラー',
+    },
+  },
 })
 
 // 制約条件検証
@@ -175,44 +179,58 @@ export const validateConstraintsRoute = createAPIRoute({
   description: '指定された時間割データに対して制約条件の検証を実行します。',
   request: {
     params: z.object({
-      timetableId: z.string().openapi({ 
+      timetableId: z.string().openapi({
         param: { name: 'timetableId', in: 'path' },
         example: 'tmt_1234567890abcdef',
-        description: '時間割ID'
-      })
+        description: '時間割ID',
+      }),
     }),
     body: {
       content: {
         'application/json': {
           schema: z.object({
-            schedules: z.array(z.object({
-              classId: z.string().openapi({ example: 'cls_1234567890abcdef' }),
-              subjectId: z.string().openapi({ example: 'sub_1234567890abcdef' }),
-              teacherId: z.string().openapi({ example: 'tch_1234567890abcdef' }),
-              classroomId: z.string().openapi({ example: 'crm_1234567890abcdef' }),
-              dayOfWeek: z.number().min(1).max(6).openapi({ example: 1, description: '曜日（1=月曜日）' }),
-              period: z.number().min(1).max(6).openapi({ example: 1, description: '時限' })
-            })).openapi({ description: '検証対象のスケジュール配列' }),
-            schoolId: z.string().openapi({ 
+            schedules: z
+              .array(
+                z.object({
+                  classId: z.string().openapi({ example: 'cls_1234567890abcdef' }),
+                  subjectId: z.string().openapi({ example: 'sub_1234567890abcdef' }),
+                  teacherId: z.string().openapi({ example: 'tch_1234567890abcdef' }),
+                  classroomId: z.string().openapi({ example: 'crm_1234567890abcdef' }),
+                  dayOfWeek: z
+                    .number()
+                    .min(1)
+                    .max(6)
+                    .openapi({ example: 1, description: '曜日（1=月曜日）' }),
+                  period: z.number().min(1).max(6).openapi({ example: 1, description: '時限' }),
+                })
+              )
+              .openapi({ description: '検証対象のスケジュール配列' }),
+            schoolId: z.string().openapi({
               example: 'sch_1234567890abcdef',
-              description: '学校ID'
+              description: '学校ID',
             }),
-            saturdayHours: z.number().min(0).max(8).default(0).openapi({ 
+            saturdayHours: z.number().min(0).max(8).default(0).openapi({
               example: 0,
-              description: '土曜日の授業時間数'
+              description: '土曜日の授業時間数',
             }),
-            enabledConstraints: z.array(z.string()).optional().openapi({
-              example: ['teacher_conflict', 'classroom_conflict'],
-              description: '有効にする制約条件ID（指定しない場合は全て）'
-            }),
-            skipConstraints: z.array(z.string()).optional().openapi({
-              example: ['time_slot_preference'],
-              description: 'スキップする制約条件ID'
-            })
-          })
-        }
-      }
-    }
+            enabledConstraints: z
+              .array(z.string())
+              .optional()
+              .openapi({
+                example: ['teacher_conflict', 'classroom_conflict'],
+                description: '有効にする制約条件ID（指定しない場合は全て）',
+              }),
+            skipConstraints: z
+              .array(z.string())
+              .optional()
+              .openapi({
+                example: ['time_slot_preference'],
+                description: 'スキップする制約条件ID',
+              }),
+          }),
+        },
+      },
+    },
   },
   responses: {
     200: {
@@ -220,29 +238,29 @@ export const validateConstraintsRoute = createAPIRoute({
         'application/json': {
           schema: z.object({
             success: z.boolean(),
-            data: ConstraintValidationResultSchema
-          })
-        }
+            data: ConstraintValidationResultSchema,
+          }),
+        },
       },
-      description: '制約検証の実行に成功'
+      description: '制約検証の実行に成功',
     },
     400: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'バリデーションエラー'
+      description: 'バリデーションエラー',
     },
     500: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'サーバーエラー'
-    }
-  }
+      description: 'サーバーエラー',
+    },
+  },
 })
 
 // カテゴリ別制約検証
@@ -254,35 +272,37 @@ export const validateConstraintsByCategoryRoute = createAPIRoute({
   description: '指定されたカテゴリの制約条件のみを対象として検証を実行します。',
   request: {
     params: z.object({
-      timetableId: z.string().openapi({ 
+      timetableId: z.string().openapi({
         param: { name: 'timetableId', in: 'path' },
         example: 'tmt_1234567890abcdef',
-        description: '時間割ID'
+        description: '時間割ID',
       }),
-      category: z.enum(['teacher', 'classroom', 'time', 'subject', 'custom']).openapi({ 
+      category: z.enum(['teacher', 'classroom', 'time', 'subject', 'custom']).openapi({
         param: { name: 'category', in: 'path' },
         example: 'teacher',
-        description: '制約カテゴリ'
-      })
+        description: '制約カテゴリ',
+      }),
     }),
     body: {
       content: {
         'application/json': {
           schema: z.object({
-            schedules: z.array(z.object({
-              classId: z.string(),
-              subjectId: z.string(),
-              teacherId: z.string(),
-              classroomId: z.string(),
-              dayOfWeek: z.number().min(1).max(6),
-              period: z.number().min(1).max(6)
-            })),
+            schedules: z.array(
+              z.object({
+                classId: z.string(),
+                subjectId: z.string(),
+                teacherId: z.string(),
+                classroomId: z.string(),
+                dayOfWeek: z.number().min(1).max(6),
+                period: z.number().min(1).max(6),
+              })
+            ),
             schoolId: z.string(),
-            saturdayHours: z.number().min(0).max(8).default(0)
-          })
-        }
-      }
-    }
+            saturdayHours: z.number().min(0).max(8).default(0),
+          }),
+        },
+      },
+    },
   },
   responses: {
     200: {
@@ -293,30 +313,30 @@ export const validateConstraintsByCategoryRoute = createAPIRoute({
             data: z.object({
               category: z.string(),
               isValid: z.boolean(),
-              violations: z.array(ConstraintViolationSchema)
-            })
-          })
-        }
+              violations: z.array(ConstraintViolationSchema),
+            }),
+          }),
+        },
       },
-      description: 'カテゴリ別制約検証の実行に成功'
+      description: 'カテゴリ別制約検証の実行に成功',
     },
     400: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'バリデーションエラー'
+      description: 'バリデーションエラー',
     },
     500: {
       content: {
         'application/json': {
-          schema: ErrorSchema
-        }
+          schema: ErrorSchema,
+        },
       },
-      description: 'サーバーエラー'
-    }
-  }
+      description: 'サーバーエラー',
+    },
+  },
 })
 
 export const constraintRoutes = [
@@ -324,5 +344,5 @@ export const constraintRoutes = [
   getConstraintDetailRoute,
   updateConstraintSettingsRoute,
   validateConstraintsRoute,
-  validateConstraintsByCategoryRoute
+  validateConstraintsByCategoryRoute,
 ]

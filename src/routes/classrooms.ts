@@ -226,11 +226,13 @@ classroomsRouter.put('/:id', zValidator('json', UpdateClassroomSchema), async c 
     }
 
     // 名前またはタイプの重複チェック（変更される場合）
-    if ((data.name && data.name !== existingClassroom.name) || 
-        (data.type && data.type !== existingClassroom.type)) {
+    if (
+      (data.name && data.name !== existingClassroom.name) ||
+      (data.type && data.type !== existingClassroom.type)
+    ) {
       const checkName = data.name || existingClassroom.name
       const checkType = data.type || existingClassroom.type
-      
+
       const duplicateClassroom = await db
         .select()
         .from(classrooms)

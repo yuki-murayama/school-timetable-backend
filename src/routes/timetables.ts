@@ -6,19 +6,27 @@
 import { zValidator } from '@hono/zod-validator'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { timetables, schools, schedules, classes, subjects, teachers, classrooms } from '../db/schema'
+import { z } from 'zod'
+import {
+  classes,
+  classrooms,
+  schedules,
+  schools,
+  subjects,
+  teachers,
+  timetables,
+} from '../db/schema'
 import { createDatabase, type Env } from '../lib/db'
 import {
-  type CreateTimetableInput,
-  CreateTimetableSchema,
-  type UpdateTimetableInput,
-  UpdateTimetableSchema,
-  type GenerateTimetableInput,
-  GenerateTimetableSchema,
   type BulkGenerateTimetableInput,
   BulkGenerateTimetableSchema,
+  type CreateTimetableInput,
+  CreateTimetableSchema,
+  type GenerateTimetableInput,
+  GenerateTimetableSchema,
+  type UpdateTimetableInput,
+  UpdateTimetableSchema,
 } from '../lib/validation'
-import { z } from 'zod'
 
 const timetablesRouter = new Hono<{ Bindings: Env }>()
 
@@ -58,7 +66,10 @@ timetablesRouter.get('/', async c => {
       query = query.where(and(...conditions))
     }
 
-    const timetablesList = await query.orderBy(desc(timetables.isActive), desc(timetables.createdAt))
+    const timetablesList = await query.orderBy(
+      desc(timetables.isActive),
+      desc(timetables.createdAt)
+    )
 
     return c.json({
       success: true,
@@ -220,10 +231,14 @@ timetablesRouter.post('/', zValidator('json', CreateTimetableSchema), async c =>
         .where(and(eq(timetables.schoolId, data.schoolId), eq(timetables.isActive, true)))
     }
 
-    const newTimetable = await db.insert(timetables).values({
-      ...data,
-      isActive: data.isActive === undefined ? true : data.isActive,
-    }).returning().get()
+    const newTimetable = await db
+      .insert(timetables)
+      .values({
+        ...data,
+        isActive: data.isActive === undefined ? true : data.isActive,
+      })
+      .returning()
+      .get()
 
     // 作成された時間割に学校情報を含めて返す
     const timetableWithSchool = await db
@@ -290,10 +305,7 @@ timetablesRouter.put('/:id', zValidator('json', UpdateTimetableSchema), async c 
         .select()
         .from(timetables)
         .where(
-          and(
-            eq(timetables.schoolId, existingTimetable.schoolId),
-            eq(timetables.name, data.name)
-          )
+          and(eq(timetables.schoolId, existingTimetable.schoolId), eq(timetables.name, data.name))
         )
         .get()
 
@@ -313,7 +325,9 @@ timetablesRouter.put('/:id', zValidator('json', UpdateTimetableSchema), async c 
       await db
         .update(timetables)
         .set({ isActive: false, updatedAt: new Date().toISOString() })
-        .where(and(eq(timetables.schoolId, existingTimetable.schoolId), eq(timetables.isActive, true)))
+        .where(
+          and(eq(timetables.schoolId, existingTimetable.schoolId), eq(timetables.isActive, true))
+        )
     }
 
     const updatedTimetable = await db
@@ -401,14 +415,16 @@ timetablesRouter.delete('/:id', async c => {
 
 // 時間割スロット一括設定
 const SetSlotsSchema = z.object({
-  slots: z.array(z.object({
-    classId: z.string().min(1, 'クラスIDは必須です'),
-    subjectId: z.string().min(1, '教科IDは必須です'),
-    teacherId: z.string().min(1, '教師IDは必須です'),
-    classroomId: z.string().optional(),
-    dayOfWeek: z.number().int().min(1).max(6), // 1=月, 2=火, ..., 6=土
-    period: z.number().int().min(1).max(8),
-  })),
+  slots: z.array(
+    z.object({
+      classId: z.string().min(1, 'クラスIDは必須です'),
+      subjectId: z.string().min(1, '教科IDは必須です'),
+      teacherId: z.string().min(1, '教師IDは必須です'),
+      classroomId: z.string().optional(),
+      dayOfWeek: z.number().int().min(1).max(6), // 1=月, 2=火, ..., 6=土
+      period: z.number().int().min(1).max(8),
+    })
+  ),
 })
 
 timetablesRouter.post('/:id/slots', zValidator('json', SetSlotsSchema), async c => {
@@ -461,17 +477,25 @@ timetablesRouter.post('/:id/slots', zValidator('json', SetSlotsSchema), async c 
 
         // 教室の確認（オプション）
         if (slot.classroomId) {
-          const classroom = await db.select().from(classrooms).where(eq(classrooms.id, slot.classroomId)).get()
+          const classroom = await db
+            .select()
+            .from(classrooms)
+            .where(eq(classrooms.id, slot.classroomId))
+            .get()
           if (!classroom) {
             errors.push({ slot, error: '教室が見つかりません' })
             continue
           }
         }
 
-        const newSlot = await db.insert(schedules).values({
-          timetableId,
-          ...slot,
-        }).returning().get()
+        const newSlot = await db
+          .insert(schedules)
+          .values({
+            timetableId,
+            ...slot,
+          })
+          .returning()
+          .get()
 
         results.push(newSlot)
       } catch (error) {
@@ -631,11 +655,7 @@ timetablesRouter.post('/:id/generate', zValidator('json', GenerateTimetableSchem
     }
 
     // 時間割の存在確認
-    const timetable = await db
-      .select()
-      .from(timetables)
-      .where(eq(timetables.id, timetableId))
-      .get()
+    const timetable = await db.select().from(timetables).where(eq(timetables.id, timetableId)).get()
 
     if (!timetable) {
       return c.json(
@@ -649,15 +669,9 @@ timetablesRouter.post('/:id/generate', zValidator('json', GenerateTimetableSchem
 
     // 時間割生成処理を動的インポート
     const { generateTimetable } = await import('../lib/timetable-generator')
-    
+
     // 時間割生成の実行（単発）
-    const result = await generateTimetable(
-      db,
-      timetableId,
-      requirements,
-      priority,
-      geminiApiKey
-    )
+    const result = await generateTimetable(db, timetableId, requirements, priority, geminiApiKey)
 
     if (result.success) {
       return c.json({
@@ -669,8 +683,12 @@ timetablesRouter.post('/:id/generate', zValidator('json', GenerateTimetableSchem
         },
       })
     } else {
-      const statusCode = result.error === 'TIMETABLE_NOT_FOUND' ? 404 : 
-                         result.error === 'INVALID_API_KEY' ? 401 : 500
+      const statusCode =
+        result.error === 'TIMETABLE_NOT_FOUND'
+          ? 404
+          : result.error === 'INVALID_API_KEY'
+            ? 401
+            : 500
 
       return c.json(
         {
@@ -701,9 +719,9 @@ timetablesRouter.get('/:id/generation-status', async c => {
 
     // 時間割生成処理を動的インポート
     const { getTimetableGenerationStatus } = await import('../lib/timetable-generator')
-    
+
     const status = await getTimetableGenerationStatus(db, timetableId)
-    
+
     if (!status.timetableExists) {
       return c.json(
         {
@@ -736,88 +754,92 @@ timetablesRouter.get('/:id/generation-status', async c => {
 })
 
 // バルク時間割生成エンドポイント
-timetablesRouter.post('/:id/bulk-generate', zValidator('json', BulkGenerateTimetableSchema), async c => {
-  try {
-    const timetableId = c.req.param('id')
-    const bulkRequest = c.req.valid('json')
-    const db = createDatabase(c.env)
+timetablesRouter.post(
+  '/:id/bulk-generate',
+  zValidator('json', BulkGenerateTimetableSchema),
+  async c => {
+    try {
+      const timetableId = c.req.param('id')
+      const bulkRequest = c.req.valid('json')
+      const db = createDatabase(c.env)
 
-    // Gemini API キーの確認
-    const geminiApiKey = c.env.GEMINI_API_KEY
-    if (!geminiApiKey) {
+      // Gemini API キーの確認
+      const geminiApiKey = c.env.GEMINI_API_KEY
+      if (!geminiApiKey) {
+        return c.json(
+          {
+            error: 'GEMINI_API_KEY_NOT_CONFIGURED',
+            message: 'Gemini API キーが設定されていません',
+          },
+          500
+        )
+      }
+
+      // 時間割の存在確認
+      const timetable = await db
+        .select()
+        .from(timetables)
+        .where(eq(timetables.id, timetableId))
+        .get()
+
+      if (!timetable) {
+        return c.json(
+          {
+            error: 'TIMETABLE_NOT_FOUND',
+            message: '指定された時間割が見つかりません',
+          },
+          404
+        )
+      }
+
+      // バルク時間割生成処理を動的インポート
+      const { generateBulkTimetable } = await import('../lib/bulk-timetable-generator')
+
+      // バルク時間割生成の実行
+      const result = await generateBulkTimetable(db, timetableId, bulkRequest, geminiApiKey)
+
+      if (result.success) {
+        return c.json({
+          success: true,
+          data: {
+            timetableId: result.data?.timetableId,
+            classIds: result.data?.classIds,
+            totalSlotsCreated: result.data?.totalSlotsCreated,
+            slotsPerClass: result.data?.slotsPerClass,
+            message: `${result.data?.classIds.length}クラスの時間割生成が完了しました`,
+          },
+        })
+      } else {
+        const statusCode =
+          result.error === 'TIMETABLE_NOT_FOUND'
+            ? 404
+            : result.error === 'CLASS_NOT_FOUND'
+              ? 404
+              : result.error === 'INVALID_API_KEY'
+                ? 401
+                : 500
+
+        return c.json(
+          {
+            error: result.error,
+            message: result.message,
+            retryable: result.retryable,
+          },
+          statusCode
+        )
+      }
+    } catch (error) {
+      console.error('バルク時間割生成エラー:', error)
       return c.json(
         {
-          error: 'GEMINI_API_KEY_NOT_CONFIGURED',
-          message: 'Gemini API キーが設定されていません',
+          error: 'BULK_GENERATE_TIMETABLE_ERROR',
+          message: 'バルク時間割生成に失敗しました',
+          retryable: true,
         },
         500
       )
     }
-
-    // 時間割の存在確認
-    const timetable = await db
-      .select()
-      .from(timetables)
-      .where(eq(timetables.id, timetableId))
-      .get()
-
-    if (!timetable) {
-      return c.json(
-        {
-          error: 'TIMETABLE_NOT_FOUND',
-          message: '指定された時間割が見つかりません',
-        },
-        404
-      )
-    }
-
-    // バルク時間割生成処理を動的インポート
-    const { generateBulkTimetable } = await import('../lib/bulk-timetable-generator')
-    
-    // バルク時間割生成の実行
-    const result = await generateBulkTimetable(
-      db,
-      timetableId,
-      bulkRequest,
-      geminiApiKey
-    )
-
-    if (result.success) {
-      return c.json({
-        success: true,
-        data: {
-          timetableId: result.data?.timetableId,
-          classIds: result.data?.classIds,
-          totalSlotsCreated: result.data?.totalSlotsCreated,
-          slotsPerClass: result.data?.slotsPerClass,
-          message: `${result.data?.classIds.length}クラスの時間割生成が完了しました`,
-        },
-      })
-    } else {
-      const statusCode = result.error === 'TIMETABLE_NOT_FOUND' ? 404 : 
-                         result.error === 'CLASS_NOT_FOUND' ? 404 :
-                         result.error === 'INVALID_API_KEY' ? 401 : 500
-
-      return c.json(
-        {
-          error: result.error,
-          message: result.message,
-          retryable: result.retryable,
-        },
-        statusCode
-      )
-    }
-  } catch (error) {
-    console.error('バルク時間割生成エラー:', error)
-    return c.json(
-      {
-        error: 'BULK_GENERATE_TIMETABLE_ERROR',
-        message: 'バルク時間割生成に失敗しました',
-        retryable: true,
-      },
-      500
-    )
   }
-})
+)
 
 export default timetablesRouter

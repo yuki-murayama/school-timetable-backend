@@ -3,13 +3,25 @@
  * 拡張されたスキーマに対応した管理・メンテナンス機能
  */
 
-import type { DrizzleDb } from './db'
-import { eq, and, desc, count, sql } from 'drizzle-orm'
-import { 
-  users, userSchools, schools, classes, teachers, subjects, classrooms,
-  timetables, timetableHistory, schedules, constraintConfigurations,
-  generationLogs, systemSettings, teacherSubjects, classroomSubjects
+import { and, count, desc, eq, sql } from 'drizzle-orm'
+import {
+  classes,
+  classroomSubjects,
+  classrooms,
+  constraintConfigurations,
+  generationLogs,
+  schedules,
+  schools,
+  subjects,
+  systemSettings,
+  teacherSubjects,
+  teachers,
+  timetableHistory,
+  timetables,
+  userSchools,
+  users,
 } from '../db/schema'
+import type { DrizzleDb } from './db'
 
 // データベース統計情報取得
 export async function getDatabaseStatistics(db: DrizzleDb) {
@@ -53,37 +65,41 @@ export async function validateSchoolDataIntegrity(db: DrizzleDb, schoolId: strin
   const classesWithoutHomeroom = await db
     .select({ id: classes.id, name: classes.name })
     .from(classes)
-    .where(and(
-      eq(classes.schoolId, schoolId),
-      eq(classes.isActive, true),
-      sql`${classes.homeRoomTeacherId} IS NULL`
-    ))
+    .where(
+      and(
+        eq(classes.schoolId, schoolId),
+        eq(classes.isActive, true),
+        sql`${classes.homeRoomTeacherId} IS NULL`
+      )
+    )
 
   if (classesWithoutHomeroom.length > 0) {
     issues.push({
       type: 'warning',
-      message: `担任が設定されていないクラスがあります: ${classesWithoutHomeroom.map(c => c.name).join(', ')}`
+      message: `担任が設定されていないクラスがあります: ${classesWithoutHomeroom.map(c => c.name).join(', ')}`,
     })
   }
 
   // 教師と教科の関係チェック
   const teachersWithoutSubjects = await db
-    .select({ 
+    .select({
       teacher: teachers.name,
-      teacherId: teachers.id 
+      teacherId: teachers.id,
     })
     .from(teachers)
     .leftJoin(teacherSubjects, eq(teachers.id, teacherSubjects.teacherId))
-    .where(and(
-      eq(teachers.schoolId, schoolId),
-      eq(teachers.isActive, true),
-      sql`${teacherSubjects.teacherId} IS NULL`
-    ))
+    .where(
+      and(
+        eq(teachers.schoolId, schoolId),
+        eq(teachers.isActive, true),
+        sql`${teacherSubjects.teacherId} IS NULL`
+      )
+    )
 
   if (teachersWithoutSubjects.length > 0) {
     issues.push({
       type: 'warning',
-      message: `担当教科が設定されていない教師がいます: ${teachersWithoutSubjects.map(t => t.teacher).join(', ')}`
+      message: `担当教科が設定されていない教師がいます: ${teachersWithoutSubjects.map(t => t.teacher).join(', ')}`,
     })
   }
 
@@ -91,26 +107,23 @@ export async function validateSchoolDataIntegrity(db: DrizzleDb, schoolId: strin
   const activeTimetables = await db
     .select()
     .from(timetables)
-    .where(and(
-      eq(timetables.schoolId, schoolId),
-      eq(timetables.isActive, true)
-    ))
+    .where(and(eq(timetables.schoolId, schoolId), eq(timetables.isActive, true)))
 
   if (activeTimetables.length === 0) {
     issues.push({
       type: 'info',
-      message: 'アクティブな時間割がありません'
+      message: 'アクティブな時間割がありません',
     })
   } else if (activeTimetables.length > 1) {
     issues.push({
       type: 'warning',
-      message: `複数のアクティブな時間割があります: ${activeTimetables.map(t => t.name).join(', ')}`
+      message: `複数のアクティブな時間割があります: ${activeTimetables.map(t => t.name).join(', ')}`,
     })
   }
 
   return {
     isValid: issues.filter(i => i.type === 'critical').length === 0,
-    issues
+    issues,
   }
 }
 
@@ -138,7 +151,7 @@ export async function createTimetableSnapshot(
   const snapshotData = {
     timetable,
     schedules: currentSchedules,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   }
 
   // 履歴レコードを作成
@@ -148,7 +161,7 @@ export async function createTimetableSnapshot(
     changeType,
     changeDescription,
     changedBy,
-    snapshotData
+    snapshotData,
   })
 }
 
@@ -167,10 +180,12 @@ export async function updateSchoolConstraintSettings(
   const existingConfig = await db
     .select()
     .from(constraintConfigurations)
-    .where(and(
-      eq(constraintConfigurations.schoolId, schoolId),
-      eq(constraintConfigurations.constraintType, constraintType)
-    ))
+    .where(
+      and(
+        eq(constraintConfigurations.schoolId, schoolId),
+        eq(constraintConfigurations.constraintType, constraintType)
+      )
+    )
     .get()
 
   if (existingConfig) {
@@ -181,7 +196,7 @@ export async function updateSchoolConstraintSettings(
         isEnabled: settings.isEnabled ?? existingConfig.isEnabled,
         priority: settings.priority ?? existingConfig.priority,
         parameters: settings.parameters ?? existingConfig.parameters,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(constraintConfigurations.id, existingConfig.id))
   } else {
@@ -192,7 +207,7 @@ export async function updateSchoolConstraintSettings(
       isEnabled: settings.isEnabled ?? true,
       priority: settings.priority ?? 5,
       parameters: settings.parameters ?? {},
-      createdBy: updatedBy
+      createdBy: updatedBy,
     })
   }
 }
@@ -213,18 +228,14 @@ export async function logTimetableGeneration(
 ) {
   await db.insert(generationLogs).values({
     ...data,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   })
 }
 
 // システム設定の管理
 export async function getSystemSetting(db: DrizzleDb, key: string) {
-  const setting = await db
-    .select()
-    .from(systemSettings)
-    .where(eq(systemSettings.key, key))
-    .get()
-  
+  const setting = await db.select().from(systemSettings).where(eq(systemSettings.key, key)).get()
+
   return setting?.value
 }
 
@@ -239,11 +250,7 @@ export async function setSystemSetting(
     updatedBy?: string
   } = {}
 ) {
-  const existing = await db
-    .select()
-    .from(systemSettings)
-    .where(eq(systemSettings.key, key))
-    .get()
+  const existing = await db.select().from(systemSettings).where(eq(systemSettings.key, key)).get()
 
   if (existing) {
     await db
@@ -254,7 +261,7 @@ export async function setSystemSetting(
         category: options.category ?? existing.category,
         isPublic: options.isPublic ?? existing.isPublic,
         updatedBy: options.updatedBy,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(systemSettings.id, existing.id))
   } else {
@@ -264,16 +271,19 @@ export async function setSystemSetting(
       description: options.description,
       category: options.category ?? 'general',
       isPublic: options.isPublic ?? false,
-      updatedBy: options.updatedBy
+      updatedBy: options.updatedBy,
     })
   }
 }
 
 // データベースクリーンアップ
-export async function cleanupOldData(db: DrizzleDb, options: {
-  olderThanDays: number
-  dryRun?: boolean
-} = { olderThanDays: 365 }) {
+export async function cleanupOldData(
+  db: DrizzleDb,
+  options: {
+    olderThanDays: number
+    dryRun?: boolean
+  } = { olderThanDays: 365 }
+) {
   const cutoffDate = new Date()
   cutoffDate.setDate(cutoffDate.getDate() - options.olderThanDays)
   const cutoffISO = cutoffDate.toISOString()
@@ -291,7 +301,7 @@ export async function cleanupOldData(db: DrizzleDb, options: {
     cleanupActions.push({
       action: 'delete_old_generation_logs',
       count: oldLogs.count,
-      description: `${options.olderThanDays}日以前の生成ログを削除`
+      description: `${options.olderThanDays}日以前の生成ログを削除`,
     })
 
     if (!options.dryRun) {
@@ -301,9 +311,9 @@ export async function cleanupOldData(db: DrizzleDb, options: {
 
   // 古いバージョンの時間割履歴を削除（最新5件は保持）
   const oldHistory = await db
-    .select({ 
+    .select({
       timetableId: timetableHistory.timetableId,
-      count: count()
+      count: count(),
     })
     .from(timetableHistory)
     .groupBy(timetableHistory.timetableId)
@@ -321,13 +331,15 @@ export async function cleanupOldData(db: DrizzleDb, options: {
       cleanupActions.push({
         action: 'delete_old_timetable_history',
         count: recordsToDelete.length,
-        description: `時間割 ${group.timetableId} の古い履歴を削除`
+        description: `時間割 ${group.timetableId} の古い履歴を削除`,
       })
 
       if (!options.dryRun && recordsToDelete.length > 0) {
-        await db.delete(timetableHistory).where(
-          sql`${timetableHistory.id} IN (${recordsToDelete.map(r => `'${r.id}'`).join(',')})`
-        )
+        await db
+          .delete(timetableHistory)
+          .where(
+            sql`${timetableHistory.id} IN (${recordsToDelete.map(r => `'${r.id}'`).join(',')})`
+          )
       }
     }
   }
@@ -335,7 +347,7 @@ export async function cleanupOldData(db: DrizzleDb, options: {
   return {
     totalActions: cleanupActions.length,
     actions: cleanupActions,
-    dryRun: options.dryRun ?? false
+    dryRun: options.dryRun ?? false,
   }
 }
 
@@ -349,24 +361,18 @@ export async function grantSchoolAccess(
   const existing = await db
     .select()
     .from(userSchools)
-    .where(and(
-      eq(userSchools.userId, userId),
-      eq(userSchools.schoolId, schoolId)
-    ))
+    .where(and(eq(userSchools.userId, userId), eq(userSchools.schoolId, schoolId)))
     .get()
 
   if (existing) {
     // 既存のアクセス権限を更新
-    await db
-      .update(userSchools)
-      .set({ role })
-      .where(eq(userSchools.id, existing.id))
+    await db.update(userSchools).set({ role }).where(eq(userSchools.id, existing.id))
   } else {
     // 新規アクセス権限を作成
     await db.insert(userSchools).values({
       userId,
       schoolId,
-      role
+      role,
     })
   }
 }
@@ -377,7 +383,7 @@ export async function analyzePerformance(db: DrizzleDb) {
     slowQueries: [],
     largestTables: [],
     indexUsage: [],
-    recommendations: []
+    recommendations: [],
   }
 
   // 最大のテーブルサイズを確認（SQLiteの場合）
@@ -396,13 +402,16 @@ export async function analyzePerformance(db: DrizzleDb) {
 
     // パフォーマンス推奨事項
     if ((tableStats[1]?.count || 0) > 10000) {
-      analysis.recommendations.push('生成ログが多く蓄積されています。定期的なクリーンアップをお勧めします。')
+      analysis.recommendations.push(
+        '生成ログが多く蓄積されています。定期的なクリーンアップをお勧めします。'
+      )
     }
 
     if ((tableStats[2]?.count || 0) > 1000) {
-      analysis.recommendations.push('時間割履歴が多く蓄積されています。古いバージョンの削除をお勧めします。')
+      analysis.recommendations.push(
+        '時間割履歴が多く蓄積されています。古いバージョンの削除をお勧めします。'
+      )
     }
-
   } catch (error) {
     console.error('Performance analysis error:', error)
   }

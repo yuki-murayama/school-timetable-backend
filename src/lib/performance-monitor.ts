@@ -27,7 +27,7 @@ class PerformanceCollector {
 
   addMetric(metric: PerformanceMetrics) {
     this.metrics.push(metric)
-    
+
     // メトリクス数制限
     if (this.metrics.length > this.maxMetrics) {
       this.metrics = this.metrics.slice(-this.maxMetrics)
@@ -67,9 +67,7 @@ class PerformanceCollector {
     memoryTrends: Array<{ timestamp: string; heapUsed: number; external: number }>
   } {
     const windowStart = timeWindow ? Date.now() - timeWindow : 0
-    const windowMetrics = this.metrics.filter(m => 
-      new Date(m.timestamp).getTime() > windowStart
-    )
+    const windowMetrics = this.metrics.filter(m => new Date(m.timestamp).getTime() > windowStart)
 
     if (windowMetrics.length === 0) {
       return {
@@ -79,14 +77,14 @@ class PerformanceCollector {
         errorRate: 0,
         slowestEndpoints: [],
         fastestEndpoints: [],
-        memoryTrends: []
+        memoryTrends: [],
       }
     }
 
     // 基本統計
     const durations = windowMetrics.map(m => m.duration).sort((a, b) => a - b)
     const errorCount = windowMetrics.filter(m => m.statusCode >= 400).length
-    
+
     // パーセンタイル計算
     const p95Index = Math.floor(durations.length * 0.95)
     const p95ResponseTime = durations[p95Index] || 0
@@ -98,7 +96,7 @@ class PerformanceCollector {
       const current = endpointStats.get(key) || { total: 0, count: 0 }
       endpointStats.set(key, {
         total: current.total + metric.duration,
-        count: current.count + 1
+        count: current.count + 1,
       })
     })
 
@@ -106,7 +104,7 @@ class PerformanceCollector {
       .map(([endpoint, stats]) => ({
         endpoint,
         averageTime: stats.total / stats.count,
-        count: stats.count
+        count: stats.count,
       }))
       .sort((a, b) => b.averageTime - a.averageTime)
 
@@ -116,7 +114,7 @@ class PerformanceCollector {
       .map(m => ({
         timestamp: m.timestamp,
         heapUsed: m.memoryUsage!.heapUsed / 1024 / 1024, // MB
-        external: m.memoryUsage!.external / 1024 / 1024  // MB
+        external: m.memoryUsage!.external / 1024 / 1024, // MB
       }))
       .slice(-50) // 最新50件
 
@@ -127,7 +125,7 @@ class PerformanceCollector {
       errorRate: errorCount / windowMetrics.length,
       slowestEndpoints: endpointAverages.slice(0, 10),
       fastestEndpoints: endpointAverages.slice(-10).reverse(),
-      memoryTrends
+      memoryTrends,
     }
   }
 
@@ -146,7 +144,7 @@ export function performanceMonitor() {
   return async (c: Context, next: () => Promise<void>) => {
     const startTime = Date.now()
     const startMemory = process.memoryUsage?.() // Workers環境では利用不可の場合がある
-    
+
     let statusCode = 200
     let errorMessage: string | undefined
 
@@ -168,14 +166,17 @@ export function performanceMonitor() {
         timestamp: new Date().toISOString(),
         memoryUsage: startMemory,
         statusCode,
-        errorMessage
+        errorMessage,
       }
 
       globalCollector.addMetric(metric)
 
       // 遅いリクエストをログ出力
-      if (duration > 1000) { // 1秒以上
-        console.warn(`Slow request detected: ${metric.method} ${metric.endpoint} took ${duration}ms`)
+      if (duration > 1000) {
+        // 1秒以上
+        console.warn(
+          `Slow request detected: ${metric.method} ${metric.endpoint} took ${duration}ms`
+        )
       }
     }
   }
@@ -219,7 +220,8 @@ export class DatabaseQueryTracker {
       this.totalQueryTime += duration
 
       // 遅いクエリをログ出力
-      if (duration > 500) { // 500ms以上
+      if (duration > 500) {
+        // 500ms以上
         console.warn(`Slow database query: ${queryName} took ${duration}ms`)
       }
 
@@ -234,7 +236,7 @@ export class DatabaseQueryTracker {
     return {
       queryCount: this.queryCount,
       totalQueryTime: this.totalQueryTime,
-      averageQueryTime: this.queryCount > 0 ? this.totalQueryTime / this.queryCount : 0
+      averageQueryTime: this.queryCount > 0 ? this.totalQueryTime / this.queryCount : 0,
     }
   }
 
@@ -264,35 +266,29 @@ export async function benchmarkEndpoint(
   successRate: number
   results: Array<{ duration: number; status: number; success: boolean }>
 }> {
-  const {
-    method = 'GET',
-    headers = {},
-    body,
-    iterations = 10,
-    concurrency = 1
-  } = options
+  const { method = 'GET', headers = {}, body, iterations = 10, concurrency = 1 } = options
 
   const results: Array<{ duration: number; status: number; success: boolean }> = []
-  
+
   // 並行実行のためのバッチ処理
   const batches = Math.ceil(iterations / concurrency)
-  
+
   for (let batch = 0; batch < batches; batch++) {
     const batchPromises = []
     const batchSize = Math.min(concurrency, iterations - batch * concurrency)
-    
+
     for (let i = 0; i < batchSize; i++) {
       batchPromises.push(
         (async () => {
           const startTime = Date.now()
           let status = 0
           let success = false
-          
+
           try {
             const response = await fetch(url, {
               method,
               headers,
-              body
+              body,
             })
             status = response.status
             success = response.ok
@@ -300,13 +296,13 @@ export async function benchmarkEndpoint(
             status = 0
             success = false
           }
-          
+
           const duration = Date.now() - startTime
           return { duration, status, success }
         })()
       )
     }
-    
+
     const batchResults = await Promise.all(batchPromises)
     results.push(...batchResults)
   }
@@ -322,6 +318,6 @@ export async function benchmarkEndpoint(
     maxTime: Math.max(...durations),
     p95Time: durations[p95Index] || 0,
     successRate: successCount / results.length,
-    results
+    results,
   }
 }

@@ -6,7 +6,7 @@
 import { zValidator } from '@hono/zod-validator'
 import { and, asc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { teachers, schools, teacherSubjects, subjects } from '../db/schema'
+import { schools, subjects, teacherSubjects, teachers } from '../db/schema'
 import { createDatabase, type Env } from '../lib/db'
 import {
   type CreateTeacherInput,
@@ -244,12 +244,7 @@ teachersRouter.put('/:id', zValidator('json', UpdateTeacherSchema), async c => {
       const duplicateTeacher = await db
         .select()
         .from(teachers)
-        .where(
-          and(
-            eq(teachers.schoolId, existingTeacher.schoolId),
-            eq(teachers.name, data.name)
-          )
-        )
+        .where(and(eq(teachers.schoolId, existingTeacher.schoolId), eq(teachers.name, data.name)))
         .get()
 
       if (duplicateTeacher) {

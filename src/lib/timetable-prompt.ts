@@ -3,9 +3,17 @@
  * データベースから情報を取得して、Claude API用のプロンプトを構築
  */
 
-import { eq, and } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { DrizzleDb } from '../db'
-import { timetables, schools, classes, subjects, teachers, classrooms, teacherSubjects } from '../db/schema'
+import {
+  classes,
+  classrooms,
+  schools,
+  subjects,
+  teacherSubjects,
+  teachers,
+  timetables,
+} from '../db/schema'
 
 interface TimetableData {
   timetable: {
@@ -96,8 +104,11 @@ export async function getTimetableGenerationData(
       .where(eq(teachers.schoolId, schoolId))
 
     // 教師ごとに担当教科をグループ化
-    const teachersMap = new Map<string, { id: string; name: string; subjects: Array<{ id: string; name: string }> }>()
-    
+    const teachersMap = new Map<
+      string,
+      { id: string; name: string; subjects: Array<{ id: string; name: string }> }
+    >()
+
     for (const teacher of teachersData) {
       if (!teachersMap.has(teacher.id)) {
         teachersMap.set(teacher.id, {
@@ -106,7 +117,7 @@ export async function getTimetableGenerationData(
           subjects: [],
         })
       }
-      
+
       if (teacher.subjectId && teacher.subjectName) {
         const teacherData = teachersMap.get(teacher.id)!
         teacherData.subjects.push({
@@ -152,12 +163,9 @@ export async function getTimetableGenerationData(
 /**
  * Gemini API用のプロンプトを生成
  */
-export function generateTimetablePrompt(
-  data: TimetableData,
-  requirements?: string
-): string {
+export function generateTimetablePrompt(data: TimetableData, requirements?: string): string {
   const { timetable, classes, teachers, subjects, classrooms } = data
-  
+
   // 基本的な時間割構造（月～金 + 土曜日の時間数）
   const weekdays = ['月', '火', '水', '木', '金']
   const saturdayHours = timetable.saturdayHours

@@ -47,12 +47,12 @@ export function normalizeGrade(grade: number): number {
  */
 export function normalizeClassName(name: string, grade: number): string {
   const sanitized = name.trim()
-  
+
   // 学年が含まれていない場合は先頭に追加
   if (!sanitized.includes(`${grade}年`)) {
     return `${grade}年${sanitized}`
   }
-  
+
   return sanitized
 }
 

@@ -12,12 +12,12 @@ export const ERROR_CODES = {
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD',
   INVALID_FORMAT: 'INVALID_FORMAT',
-  
+
   // リソースエラー
   RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
   RESOURCE_ALREADY_EXISTS: 'RESOURCE_ALREADY_EXISTS',
   RESOURCE_CONFLICT: 'RESOURCE_CONFLICT',
-  
+
   // 認証・認可エラー
   UNAUTHORIZED: 'UNAUTHORIZED',
   FORBIDDEN: 'FORBIDDEN',
@@ -27,29 +27,29 @@ export const ERROR_CODES = {
   INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
   FORBIDDEN_OPERATION: 'FORBIDDEN_OPERATION',
   INVALID_REQUEST: 'INVALID_REQUEST',
-  
+
   // 外部API関連エラー
   GEMINI_API_ERROR: 'GEMINI_API_ERROR',
   GEMINI_API_KEY_INVALID: 'GEMINI_API_KEY_INVALID',
   GEMINI_QUOTA_EXCEEDED: 'GEMINI_QUOTA_EXCEEDED',
-  
+
   // システムエラー
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   DATABASE_ERROR: 'DATABASE_ERROR',
   TIMEOUT_ERROR: 'TIMEOUT_ERROR',
-  
+
   // 時間割生成関連エラー
   TIMETABLE_GENERATION_FAILED: 'TIMETABLE_GENERATION_FAILED',
   CONSTRAINT_VIOLATION: 'CONSTRAINT_VIOLATION',
   INVALID_SCHEDULE_DATA: 'INVALID_SCHEDULE_DATA',
-  
+
   // 制約条件関連エラー
   CONSTRAINT_NOT_FOUND: 'CONSTRAINT_NOT_FOUND',
   CONSTRAINT_VALIDATION_FAILED: 'CONSTRAINT_VALIDATION_FAILED',
-  INVALID_CONSTRAINT_CONFIG: 'INVALID_CONSTRAINT_CONFIG'
+  INVALID_CONSTRAINT_CONFIG: 'INVALID_CONSTRAINT_CONFIG',
 } as const
 
-export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
 
 // エラーレスポンス型定義
 export interface ErrorResponse {
@@ -78,124 +78,124 @@ const ERROR_INFO_MAP: Record<ErrorCode, ErrorInfo> = {
     statusCode: 400,
     message: 'リクエストデータの検証に失敗しました',
     retryable: false,
-    helpUrl: '/docs/ui#validation'
+    helpUrl: '/docs/ui#validation',
   },
   [ERROR_CODES.MISSING_REQUIRED_FIELD]: {
     statusCode: 400,
     message: '必須フィールドが不足しています',
-    retryable: false
+    retryable: false,
   },
   [ERROR_CODES.INVALID_FORMAT]: {
     statusCode: 400,
     message: 'データ形式が正しくありません',
-    retryable: false
+    retryable: false,
   },
-  
+
   // リソースエラー
   [ERROR_CODES.RESOURCE_NOT_FOUND]: {
     statusCode: 404,
     message: '指定されたリソースが見つかりません',
-    retryable: false
+    retryable: false,
   },
   [ERROR_CODES.RESOURCE_ALREADY_EXISTS]: {
     statusCode: 409,
     message: '指定されたリソースは既に存在します',
-    retryable: false
+    retryable: false,
   },
   [ERROR_CODES.RESOURCE_CONFLICT]: {
     statusCode: 409,
     message: 'リソースの競合が発生しました',
-    retryable: true
+    retryable: true,
   },
-  
+
   // 認証・認可エラー
   [ERROR_CODES.UNAUTHORIZED]: {
     statusCode: 401,
     message: '認証が必要です',
     retryable: false,
-    helpUrl: '/docs/ui#authentication'
+    helpUrl: '/docs/ui#authentication',
   },
   [ERROR_CODES.FORBIDDEN]: {
     statusCode: 403,
     message: 'この操作を実行する権限がありません',
-    retryable: false
+    retryable: false,
   },
   [ERROR_CODES.INVALID_TOKEN]: {
     statusCode: 401,
     message: '無効な認証トークンです',
-    retryable: false
+    retryable: false,
   },
-  
+
   // 外部API関連エラー
   [ERROR_CODES.GEMINI_API_ERROR]: {
     statusCode: 502,
     message: 'Gemini API との通信でエラーが発生しました',
-    retryable: true
+    retryable: true,
   },
   [ERROR_CODES.GEMINI_API_KEY_INVALID]: {
     statusCode: 401,
     message: 'Gemini API キーが無効です',
     retryable: false,
-    helpUrl: '/docs/ui#gemini-setup'
+    helpUrl: '/docs/ui#gemini-setup',
   },
   [ERROR_CODES.GEMINI_QUOTA_EXCEEDED]: {
     statusCode: 429,
     message: 'Gemini API の利用制限に達しました',
-    retryable: true
+    retryable: true,
   },
-  
+
   // システムエラー
   [ERROR_CODES.INTERNAL_ERROR]: {
     statusCode: 500,
     message: 'サーバー内部エラーが発生しました',
-    retryable: true
+    retryable: true,
   },
   [ERROR_CODES.DATABASE_ERROR]: {
     statusCode: 500,
     message: 'データベースエラーが発生しました',
-    retryable: true
+    retryable: true,
   },
   [ERROR_CODES.TIMEOUT_ERROR]: {
     statusCode: 504,
     message: '処理がタイムアウトしました',
-    retryable: true
+    retryable: true,
   },
-  
+
   // 時間割生成関連エラー
   [ERROR_CODES.TIMETABLE_GENERATION_FAILED]: {
     statusCode: 422,
     message: '時間割生成に失敗しました',
     retryable: true,
-    helpUrl: '/docs/ui#timetable-generation'
+    helpUrl: '/docs/ui#timetable-generation',
   },
   [ERROR_CODES.CONSTRAINT_VIOLATION]: {
     statusCode: 422,
     message: '制約条件に違反しています',
     retryable: false,
-    helpUrl: '/docs/ui#constraints'
+    helpUrl: '/docs/ui#constraints',
   },
   [ERROR_CODES.INVALID_SCHEDULE_DATA]: {
     statusCode: 400,
     message: '時間割データが正しくありません',
-    retryable: false
+    retryable: false,
   },
-  
+
   // 制約条件関連エラー
   [ERROR_CODES.CONSTRAINT_NOT_FOUND]: {
     statusCode: 404,
     message: '指定された制約条件が見つかりません',
-    retryable: false
+    retryable: false,
   },
   [ERROR_CODES.CONSTRAINT_VALIDATION_FAILED]: {
     statusCode: 422,
     message: '制約条件の検証に失敗しました',
-    retryable: false
+    retryable: false,
   },
   [ERROR_CODES.INVALID_CONSTRAINT_CONFIG]: {
     statusCode: 400,
     message: '制約条件の設定が正しくありません',
-    retryable: false
-  }
+    retryable: false,
+  },
 }
 
 /**
@@ -208,7 +208,7 @@ export function createErrorResponse(
   requestId?: string
 ): ErrorResponse {
   const errorInfo = ERROR_INFO_MAP[errorCode]
-  
+
   return {
     success: false,
     error: errorCode,
@@ -217,7 +217,7 @@ export function createErrorResponse(
     timestamp: new Date().toISOString(),
     requestId,
     retryable: errorInfo.retryable,
-    helpUrl: errorInfo.helpUrl
+    helpUrl: errorInfo.helpUrl,
   }
 }
 
@@ -233,15 +233,15 @@ export function sendErrorResponse(
 ) {
   const errorInfo = ERROR_INFO_MAP[errorCode]
   const errorResponse = createErrorResponse(errorCode, customMessage, details, requestId)
-  
+
   console.error(`[${errorCode}] ${errorResponse.message}`, {
     requestId,
     details,
     timestamp: errorResponse.timestamp,
     url: c.req.url,
-    method: c.req.method
+    method: c.req.method,
   })
-  
+
   return c.json(errorResponse, errorInfo.statusCode)
 }
 
@@ -253,7 +253,7 @@ export function createValidationErrorResponse(
   requestId?: string
 ): ErrorResponse {
   const details = validationErrors.map(err => `${err.field}: ${err.message}`)
-  
+
   return createErrorResponse(
     ERROR_CODES.VALIDATION_FAILED,
     `${validationErrors.length}個のバリデーションエラーがあります`,
@@ -269,11 +269,11 @@ export function convertGeminiError(error: any, requestId?: string): ErrorRespons
   if (error.message?.includes('API key')) {
     return createErrorResponse(ERROR_CODES.GEMINI_API_KEY_INVALID, undefined, undefined, requestId)
   }
-  
+
   if (error.message?.includes('quota') || error.message?.includes('limit')) {
     return createErrorResponse(ERROR_CODES.GEMINI_QUOTA_EXCEEDED, undefined, undefined, requestId)
   }
-  
+
   return createErrorResponse(
     ERROR_CODES.GEMINI_API_ERROR,
     `Gemini API エラー: ${error.message}`,
@@ -294,7 +294,7 @@ export function convertDatabaseError(error: any, requestId?: string): ErrorRespo
       requestId
     )
   }
-  
+
   if (error.message?.includes('NOT NULL constraint')) {
     return createErrorResponse(
       ERROR_CODES.MISSING_REQUIRED_FIELD,
@@ -303,7 +303,7 @@ export function convertDatabaseError(error: any, requestId?: string): ErrorRespo
       requestId
     )
   }
-  
+
   return createErrorResponse(
     ERROR_CODES.DATABASE_ERROR,
     `データベースエラー: ${error.message}`,
@@ -326,28 +326,28 @@ export function errorHandler() {
   return async (c: Context, next: () => Promise<void>) => {
     const requestId = generateRequestId()
     c.set('requestId', requestId)
-    
+
     try {
       await next()
     } catch (error: any) {
       console.error('Unhandled error:', error, { requestId })
-      
+
       // 既知のエラータイプに応じて適切なレスポンスを生成
       if (error.name === 'ZodError') {
         const validationErrors = error.errors.map((err: any) => ({
           field: err.path.join('.'),
-          message: err.message
+          message: err.message,
         }))
         const errorResponse = createValidationErrorResponse(validationErrors, requestId)
         return c.json(errorResponse, 400)
       }
-      
+
       // データベースエラー
       if (error.code && error.code.startsWith('SQLITE_')) {
         const errorResponse = convertDatabaseError(error, requestId)
         return c.json(errorResponse, ERROR_INFO_MAP[errorResponse.error].statusCode)
       }
-      
+
       // デフォルトの内部エラー
       const errorResponse = createErrorResponse(
         ERROR_CODES.INTERNAL_ERROR,
