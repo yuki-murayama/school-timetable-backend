@@ -35,3 +35,4 @@ lerna-debug.log*
 
 # claude
 AI_INSTRUCTIONS.md
+wrangler.jsonc
