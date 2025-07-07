@@ -1357,4 +1357,144 @@ app.put('/api/frontend/school/classrooms', async c => {
   }
 })
 
+// 条件設定API
+// 1. 条件設定取得
+app.get('/api/frontend/school/conditions', async c => {
+  try {
+    const db = c.env.DB
+    
+    // school_conditionsテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS school_conditions (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        conditions TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+    
+    // 条件設定を取得
+    const result = await db
+      .prepare(`
+      SELECT * FROM school_conditions WHERE school_id = ? LIMIT 1
+    `)
+      .bind('school-1')
+      .first()
+    
+    const conditions = result ? (result.conditions as string) || '' : ''
+    
+    return c.json({
+      success: true,
+      data: {
+        conditions,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
+// 2. 条件設定保存
+app.put('/api/frontend/school/conditions', async c => {
+  try {
+    const body = await c.req.json()
+    const db = c.env.DB
+    
+    // バリデーション
+    if (body.conditions !== undefined && body.conditions !== null) {
+      if (typeof body.conditions !== 'string') {
+        return c.json(
+          {
+            success: false,
+            message: '入力データが不正です',
+            errors: ['条件設定は文字列である必要があります'],
+          },
+          400
+        )
+      }
+      
+      if (body.conditions.length > 10000) {
+        return c.json(
+          {
+            success: false,
+            message: '入力データが不正です',
+            errors: ['条件設定は10000文字以内で入力してください'],
+          },
+          400
+        )
+      }
+    }
+    
+    // school_conditionsテーブルが存在しない場合は作成
+    await db
+      .prepare(`
+      CREATE TABLE IF NOT EXISTS school_conditions (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL DEFAULT 'school-1',
+        conditions TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+      .run()
+    
+    const conditions = body.conditions || ''
+    const now = new Date().toISOString()
+    
+    // 既存の条件設定を確認
+    const existing = await db
+      .prepare(`
+      SELECT id FROM school_conditions WHERE school_id = ? LIMIT 1
+    `)
+      .bind('school-1')
+      .first()
+    
+    if (existing) {
+      // 更新
+      await db
+        .prepare(`
+        UPDATE school_conditions 
+        SET conditions = ?, updated_at = ?
+        WHERE school_id = ?
+      `)
+        .bind(conditions, now, 'school-1')
+        .run()
+    } else {
+      // 新規作成
+      const conditionId = `condition-${Date.now()}`
+      await db
+        .prepare(`
+        INSERT INTO school_conditions (id, school_id, conditions, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+        .bind(conditionId, 'school-1', conditions, now, now)
+        .run()
+    }
+    
+    return c.json({
+      success: true,
+      data: {
+        conditions,
+      },
+    })
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        message: `Database error: ${(error as Error).message}`,
+      },
+      500
+    )
+  }
+})
+
 export default app
