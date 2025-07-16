@@ -13,7 +13,7 @@ import authRouter from './routes/auth'
 
 type Env = {
   DB: D1Database
-  GEMINI_API_KEY: string
+  GROQ_API_KEY: string
   AUTH0_DOMAIN: string
   AUTH0_AUDIENCE: string
   AUTH0_CLIENT_ID: string

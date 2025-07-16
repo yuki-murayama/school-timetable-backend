@@ -280,7 +280,7 @@ app.get('/health', c => {
       services: {
         database: 'connected',
         constraints: 'ready',
-        gemini: c.env.GEMINI_API_KEY ? 'configured' : 'not_configured',
+        groq: c.env.GROQ_API_KEY ? 'configured' : 'not_configured',
       },
     },
   })

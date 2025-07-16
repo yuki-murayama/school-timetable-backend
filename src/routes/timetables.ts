@@ -642,13 +642,13 @@ timetablesRouter.post('/:id/generate', zValidator('json', GenerateTimetableSchem
     const { requirements, priority } = c.req.valid('json')
     const db = createDatabase(c.env)
 
-    // Gemini API キーの確認
-    const geminiApiKey = c.env.GEMINI_API_KEY
-    if (!geminiApiKey) {
+    // Groq API キーの確認
+    const groqApiKey = c.env.GROQ_API_KEY
+    if (!groqApiKey) {
       return c.json(
         {
-          error: 'GEMINI_API_KEY_NOT_CONFIGURED',
-          message: 'Gemini API キーが設定されていません',
+          error: 'GROQ_API_KEY_NOT_CONFIGURED',
+          message: 'Groq API キーが設定されていません',
         },
         500
       )
@@ -671,7 +671,7 @@ timetablesRouter.post('/:id/generate', zValidator('json', GenerateTimetableSchem
     const { generateTimetable } = await import('../lib/timetable-generator')
 
     // 時間割生成の実行（単発）
-    const result = await generateTimetable(db, timetableId, requirements, priority, geminiApiKey)
+    const result = await generateTimetable(db, timetableId, requirements, priority, groqApiKey)
 
     if (result.success) {
       return c.json({
@@ -763,13 +763,13 @@ timetablesRouter.post(
       const bulkRequest = c.req.valid('json')
       const db = createDatabase(c.env)
 
-      // Gemini API キーの確認
-      const geminiApiKey = c.env.GEMINI_API_KEY
-      if (!geminiApiKey) {
+      // Groq API キーの確認
+      const groqApiKey = c.env.GROQ_API_KEY
+      if (!groqApiKey) {
         return c.json(
           {
-            error: 'GEMINI_API_KEY_NOT_CONFIGURED',
-            message: 'Gemini API キーが設定されていません',
+            error: 'GROQ_API_KEY_NOT_CONFIGURED',
+            message: 'Groq API キーが設定されていません',
           },
           500
         )
@@ -796,7 +796,7 @@ timetablesRouter.post(
       const { generateBulkTimetable } = await import('../lib/bulk-timetable-generator')
 
       // バルク時間割生成の実行
-      const result = await generateBulkTimetable(db, timetableId, bulkRequest, geminiApiKey)
+      const result = await generateBulkTimetable(db, timetableId, bulkRequest, groqApiKey)
 
       if (result.success) {
         return c.json({

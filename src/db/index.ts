@@ -7,7 +7,7 @@ import * as schema from './schema'
 
 export interface Env {
   DB: D1Database
-  GEMINI_API_KEY?: string
+  GROQ_API_KEY?: string
 }
 
 export function createDb(env: Env) {
